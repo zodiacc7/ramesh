@@ -47,6 +47,7 @@ import com.ramesh.sms.theme.bubbleBackground
 import com.ramesh.sms.theme.bubbleContentBottomPadding
 import com.ramesh.sms.theme.chatBubbleShape
 import com.ramesh.sms.theme.bubbleContent
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
 import com.ramesh.sms.ui.util.forMessageBody
@@ -68,7 +69,8 @@ fun MessageBubble(
     onBubbleTouched: () -> Unit = {},
     onOutsideTap: () -> Unit = {},
     showAvatar: Boolean = false,
-    avatar: (@Composable () -> Unit)? = null
+    avatar: (@Composable () -> Unit)? = null,
+    appLanguage: AppLanguage = AppLanguage.SYSTEM,
 ) {
     val isSent = message.isSent
     val look = AppearanceStore.current
@@ -86,7 +88,9 @@ fun MessageBubble(
         isSent -> null
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     }
-    val dateText = remember(message.date, useShamsi) { SmsDateFormats.formatDate(message.date, useShamsi) }
+    val dateText = remember(message.date, useShamsi, appLanguage) {
+        SmsDateFormats.formatDate(message.date, useShamsi, appLanguage)
+    }
     val timeText = remember(message.date) { SmsDateFormats.clock(message.date) }
     // Keep long messages from touching both edges, like every modern messenger.
     val context = LocalContext.current

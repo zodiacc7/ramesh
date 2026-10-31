@@ -25,6 +25,7 @@ import com.ramesh.sms.data.model.SimInfo
 import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.data.repository.SendSmsResult
 import com.ramesh.sms.data.repository.SmsRepository
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.util.AppPreferences
 import com.ramesh.sms.data.util.UserPreferences
@@ -59,6 +60,8 @@ data class ChatUiState(
     val selectedSim: SimInfo? = null,
     val showShamsiDate: Boolean = false,
     val enableDateTapShamsiToggle: Boolean = true,
+    /** UI language for date formatting. */
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** Countdown for the configurable "send delay"; 0 when no message is queued. */
     val pendingSendSecondsLeft: Int = 0,
     val pendingSendText: String? = null
@@ -94,7 +97,8 @@ class ChatViewModel(
             contactName = initialContactName,
             showShamsiDate = userPreferences.jalaliScope == JalaliScope.EVERYWHERE ||
                 userPreferences.showShamsiDate,
-            enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle
+            enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle,
+            appLanguage = userPreferences.appLanguage,
         )
     )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
