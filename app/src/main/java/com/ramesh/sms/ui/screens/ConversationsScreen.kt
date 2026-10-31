@@ -112,6 +112,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -1797,12 +1798,11 @@ private fun SwipeToDeleteContainer(
                 .graphicsLayer { translationX = animatedOffset }
                 .pointerInput(Unit) {
                     detectDragGestures(
-                        onDragStart = { change, offset ->
-                            // Don't consume down event; allow taps to propagate to children
+                        onDragStart = { _: Offset ->
+                            // Don't consume; allow taps to propagate to children
                         },
-                        onDrag = { change, dragAmount ->
+                        onDrag = { dragAmount: Offset ->
                             if (enabled) {
-                                change.consume()
                                 targetOffset = (targetOffset + dragAmount.x).coerceIn(-revealPx, revealPx)
                             }
                         },
