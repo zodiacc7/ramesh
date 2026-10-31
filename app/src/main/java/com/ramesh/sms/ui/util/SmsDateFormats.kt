@@ -167,9 +167,9 @@ object SmsDateFormats {
                 "$monthName ${jDate.day}"
             }
         } else {
-            // Long date: always numeric YYYY/MM/DD in every language
+            // Long date: Persian keeps month names; English uses numeric YYYY/MM/DD
             if (isPersian) {
-                "${toPersianDigits(jDate.year)}/${toPersianDigits(jDate.month)}/${toPersianDigits(jDate.day)}"
+                "${toPersianDigits(jDate.day)} $monthName ${toPersianDigits(jDate.year)}"
             } else {
                 "$yearNum/$monthNum/$dayNum"
             }
@@ -199,9 +199,10 @@ object SmsDateFormats {
             val jDate = toJalali(messageDate.year, messageDate.monthValue, messageDate.dayOfMonth)
             val timePart = clock(timestamp)
             val isPersian = appLanguage == AppLanguage.PERSIAN
-            // Long date: always numeric YYYY/MM/DD in every language
+            // Long date: Persian keeps month names; English uses numeric YYYY/MM/DD
             val datePart = if (isPersian) {
-                "${toPersianDigits(jDate.year)}/${toPersianDigits(jDate.month)}/${toPersianDigits(jDate.day)}"
+                val monthName = SHAMSI_MONTH_NAMES.getOrElse(jDate.month - 1) { "" }
+                "${toPersianDigits(jDate.year)} $monthName ${toPersianDigits(jDate.day)}"
             } else {
                 "${String.format(Locale.US, "%04d", jDate.year)}/${String.format(Locale.US, "%02d", jDate.month)}/${String.format(Locale.US, "%02d", jDate.day)}"
             }
