@@ -95,7 +95,6 @@ class ConversationsViewModel(
     private var loadJob: Job? = null
     private var defaultSmsCheckJob: Job? = null
     private var observerDebounceJob: Job? = null
-    private var lastLoadFinishedAt = 0L
 
     /** True once the tab strip has been read, so the launch default is applied only once. */
     private var initialTabApplied = false
@@ -236,12 +235,6 @@ class ConversationsViewModel(
             )
         }
 
-        if (!force && silent) {
-            val elapsed = System.currentTimeMillis() - lastLoadFinishedAt
-            if (lastLoadFinishedAt > 0L && elapsed < SILENT_LOAD_MIN_INTERVAL_MS) {
-                return
-            }
-        }
         if (loadJob?.isActive == true) {
             if (silent && !force) return
             loadJob?.cancel()
@@ -279,7 +272,6 @@ class ConversationsViewModel(
                     filteredThreads = filterThreads(threads, currentQuery),
                     error = null
                 )
-                lastLoadFinishedAt = System.currentTimeMillis()
                 if (currentQuery.length >= SEARCH_MIN_QUERY_LENGTH) {
                     val messages = repository.searchAllMessages(currentQuery)
                     _uiState.value = _uiState.value.copy(
@@ -892,6 +884,5 @@ class ConversationsViewModel(
 }
 
 private const val SMS_OBSERVER_DEBOUNCE_MS = 400L
-private const val SILENT_LOAD_MIN_INTERVAL_MS = 3_000L
 private const val SEARCH_MIN_QUERY_LENGTH = 2
 private const val SMS_PERMISSION_ERROR = "SMS permission required"

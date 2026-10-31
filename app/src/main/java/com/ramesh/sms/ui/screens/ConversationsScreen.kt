@@ -22,10 +22,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1731,10 +1729,9 @@ private fun SwipeToDeleteContainer(
     val layoutDirection = LocalLayoutDirection.current
     val isRtl = layoutDirection == LayoutDirection.Rtl
     var targetOffset by remember { mutableFloatStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
     val animatedOffset by animateFloat(
         targetValue = targetOffset,
-        animationSpec = tween(durationMillis = if (isDragging) 0 else 170),
+        animationSpec = tween(durationMillis = 170),
         label = "swipeReveal"
     )
     val revealed = abs(animatedOffset) > 1f
@@ -1798,22 +1795,26 @@ private fun SwipeToDeleteContainer(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer { translationX = animatedOffset }
-                .draggable(
-                    state = rememberDraggableState { delta ->
-                        targetOffset = (targetOffset + delta).coerceIn(-revealPx, revealPx)
-                    },
-                    enabled = enabled,
-                    orientation = Orientation.Horizontal,
-                    onDragStarted = { isDragging = true },
-                    onDragStopped = {
-                        isDragging = false
-                        targetOffset = when {
-                            abs(targetOffset) < revealPx / 2f -> 0f
-                            targetOffset > 0f -> revealPx
-                            else -> -revealPx
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { change, offset ->
+                            // Don't consume down event; allow taps to propagate to children
+                        },
+                        onDrag = { change, dragAmount ->
+                            if (enabled) {
+                                change.consume()
+                                targetOffset = (targetOffset + dragAmount.x).coerceIn(-revealPx, revealPx)
+                            }
+                        },
+                        onDragEnd = {
+                            targetOffset = when {
+                                abs(targetOffset) < revealPx / 2f -> 0f
+                                targetOffset > 0f -> revealPx
+                                else -> -revealPx
+                            }
                         }
-                    }
-                )
+                    )
+                }
         ) {
             Box(
                 modifier = Modifier
