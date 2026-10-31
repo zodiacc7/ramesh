@@ -780,7 +780,9 @@ fun ConversationsScreen(
                             contactLookupUri = thread.contactLookupUri,
                             isContact = thread.isContact
                         )
-                    }
+                    },
+                    onDelete = { requestDeleteConversation(it) },
+                    onMarkRead = { viewModel.clearUnreadForThread(it) }
                 )
             }
         }
@@ -1225,9 +1227,12 @@ private fun ConversationsInboxList(
     onOpenChat: (ChatNav) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onEnterSelection: (Long) -> Unit,
-    onAvatarClick: (ConversationThread) -> Unit
+    onAvatarClick: (ConversationThread) -> Unit,
+    onDelete: ((ConversationThread) -> Unit)? = null,
+    onMarkRead: ((Long) -> Unit)? = null
 ) {
     val showAvatars = AppearanceStore.current.showInboxAvatars
+    val swipeEnabled = AppearanceStore.current.swipeToDelete
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = ListBottomFabPadding)
@@ -1237,38 +1242,44 @@ private fun ConversationsInboxList(
             key = { it.threadId },
             contentType = { "thread" }
         ) { thread ->
-            ConversationItem(
-                thread = thread,
-                selectedIds = selectedIds,
-                isSelectionMode = isSelectionMode,
-                showAvatar = showAvatars,
-                simSlotNumber = if (hasMultipleSims && showSimBadge) simSlotMap[thread.subId] else null,
-                useShamsi = useShamsi,
-                appLanguage = appLanguage,
-                onClick = {
-                    if (isSelectionMode) {
-                        onToggleSelect(thread.threadId)
-                    } else {
-                        onOpenChat(
-                            ChatNav(
-                                threadId = thread.threadId,
-                                address = thread.address,
-                                contactName = thread.contactName
+            SwipeToDeleteContainer(
+                enabled = swipeEnabled && !isSelectionMode,
+                onDelete = { onDelete?.invoke(thread) },
+                onMarkRead = { onMarkRead?.invoke(thread.threadId) }
+            ) {
+                ConversationItem(
+                    thread = thread,
+                    selectedIds = selectedIds,
+                    isSelectionMode = isSelectionMode,
+                    showAvatar = showAvatars,
+                    simSlotNumber = if (hasMultipleSims && showSimBadge) simSlotMap[thread.subId] else null,
+                    useShamsi = useShamsi,
+                    appLanguage = appLanguage,
+                    onClick = {
+                        if (isSelectionMode) {
+                            onToggleSelect(thread.threadId)
+                        } else {
+                            onOpenChat(
+                                ChatNav(
+                                    threadId = thread.threadId,
+                                    address = thread.address,
+                                    contactName = thread.contactName
+                                )
                             )
-                        )
+                        }
+                    },
+                    onLongClick = {
+                        if (isSelectionMode) {
+                            onToggleSelect(thread.threadId)
+                        } else {
+                            onEnterSelection(thread.threadId)
+                        }
+                    },
+                    onAvatarClick = {
+                        onAvatarClick(thread)
                     }
-                },
-                onLongClick = {
-                    if (isSelectionMode) {
-                        onToggleSelect(thread.threadId)
-                    } else {
-                        onEnterSelection(thread.threadId)
-                    }
-                },
-                onAvatarClick = {
-                    onAvatarClick(thread)
-                }
-            )
+                )
+            }
             HorizontalDivider(
                 modifier = Modifier.padding(
                     start = if (showAvatars) AvatarDividerInset else 16.dp,

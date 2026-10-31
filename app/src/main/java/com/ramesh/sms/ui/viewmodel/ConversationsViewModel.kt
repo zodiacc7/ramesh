@@ -326,6 +326,11 @@ class ConversationsViewModel(
         } catch (e: Exception) {
             Log.e("ConversationsViewModel", "Failed to register threads observer", e)
         }
+        try {
+            resolver.registerContentObserver(Telephony.Sms.Inbox.CONTENT_URI, true, observer)
+        } catch (e: Exception) {
+            Log.e("ConversationsViewModel", "Failed to register inbox observer", e)
+        }
     }
 
     override fun onCleared() {
