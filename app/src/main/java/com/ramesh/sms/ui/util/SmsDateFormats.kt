@@ -160,7 +160,7 @@ object SmsDateFormats {
         val yearNum = jDate.year.toString()
 
         // Short date (same year): "23 Shahrivar" / "شهریور ۲۳"
-        if (jDate.year == nowJDate.year) {
+        return if (jDate.year == nowJDate.year) {
             if (isPersian) {
                 "${toPersianDigits(jDate.day)} $monthName"
             } else {
