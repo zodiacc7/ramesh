@@ -1,22 +1,20 @@
 package com.ramesh.sms
 
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.ramesh.sms.theme.AppearanceStore
+import com.ramesh.sms.theme.conversationEnterTransition
+import com.ramesh.sms.theme.conversationExitTransition
 import com.ramesh.sms.ui.screens.ChatScreen
 import com.ramesh.sms.ui.screens.ComposeScreen
 import com.ramesh.sms.ui.screens.ConversationsScreen
@@ -33,8 +31,8 @@ fun MainNavigation(
 ) {
     val backStack = rememberNavBackStack(ConversationsNav)
     val conversationsViewModel: ConversationsViewModel = viewModel()
-    // Forward means "towards the end of the line", which is the left in RTL layouts.
-    val forwardSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
+    // Forward means "towards the end of the line", which is the left in RTL layouts. The helpers
+    // in MessageTransitions mirror themselves for a back navigation; this flips them for RTL.
 
     LaunchedEffect(pendingChatNav) {
         if (pendingChatNav != null) {
@@ -68,30 +66,22 @@ fun MainNavigation(
         }
     }
 
+    // The "message animation" setting is about entering and leaving screens - opening a
+    // conversation, closing it, opening settings - not about how an individual bubble appears.
+    val animationStyle = AppearanceStore.current.messageAnimation
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
     NavDisplay(
         backStack = backStack,
-        // Both directions are exact mirrors: slide-in + fade-in for incoming, slide-out + fade-out
-        // for outgoing. Same duration both directions so entering and exiting feel identical.
+        // Both directions are exact mirrors: the incoming screen slides in while the outgoing one
+        // slides away, and the chosen style decides between slide, fade, pop and none.
         transitionSpec = {
-            (slideInHorizontally(animationSpec = tween(PageTransitionMillis)) { full ->
-                (full * forwardSign).toInt()
-            } + fadeIn(animationSpec = tween(PageTransitionMillis)))
-                .togetherWith(
-                    slideOutHorizontally(animationSpec = tween(PageTransitionMillis)) { full ->
-                        (-full * forwardSign).toInt()
-                    } + fadeOut(animationSpec = tween(PageTransitionMillis))
-                )
+            conversationEnterTransition(animationStyle, forward = true, rtl = rtl)
+                .togetherWith(conversationExitTransition(animationStyle, forward = true, rtl = rtl))
         },
         popTransitionSpec = {
-            // Mirror of transitionSpec: when popping (back), incoming comes from the opposite side.
-            (slideInHorizontally(animationSpec = tween(PageTransitionMillis)) { full ->
-                (-full * forwardSign).toInt()
-            } + fadeIn(animationSpec = tween(PageTransitionMillis)))
-                .togetherWith(
-                    slideOutHorizontally(animationSpec = tween(PageTransitionMillis)) { full ->
-                        (full * forwardSign).toInt()
-                    } + fadeOut(animationSpec = tween(PageTransitionMillis))
-                )
+            conversationEnterTransition(animationStyle, forward = false, rtl = rtl)
+                .togetherWith(conversationExitTransition(animationStyle, forward = false, rtl = rtl))
         },
         entryProvider = entryProvider {
             entry<ConversationsNav> {
@@ -152,6 +142,3 @@ fun MainNavigation(
         backStack.removeLastOrNull()
     }
 }
-
-/** Duration of the screen change animation, kept short so it never feels sluggish. */
-private const val PageTransitionMillis = 240

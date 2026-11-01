@@ -592,7 +592,11 @@ class SmsRepository(
         // Reactions arrive as plain SMS from clients with no reaction protocol, for example
         // Reacted 👍 to "see you at 8". Fold them onto the message they quote instead of showing
         // a second bubble that reads like the contact answered with a sentence about reacting.
-        foldSmsReactions(messages)
+        val folded = foldSmsReactions(messages)
+        if (folded.size != messages.size) {
+            Log.d(TAG, "Folded ${messages.size - folded.size} reaction SMS in thread $threadId")
+        }
+        folded
     }
 
     /**

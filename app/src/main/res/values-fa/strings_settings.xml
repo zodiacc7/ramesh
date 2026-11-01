@@ -99,12 +99,12 @@
     <string name="settings_seconds_value">%1$d ثانیه</string>
     <string name="settings_messages_count">%1$s پیام</string>
     <string name="settings_message_animation">انیمیشن پیام‌ها</string>
-    <string name="settings_message_animation_sub">نحوهٔ ظاهر شدن پیام جدید در گفتگو</string>
+    <string name="settings_message_animation_sub">نحوهٔ باز و بسته شدن گفتگوها</string>
+    <string name="settings_animation_preview_page">گفتگو</string>
     <string name="settings_animation_fade">محو</string>
     <string name="settings_animation_slide">کشویی</string>
     <string name="settings_animation_pop">جهشی</string>
     <string name="settings_animation_none">بدون انیمیشن</string>
-    <string name="settings_animation_preview_bubble">پیام تازه</string>
     <string name="settings_animation_replay">برای تکرار بزنید</string>
     <string name="settings_wallpaper_needs_pick">عکس پس‌زمینه باید دوباره انتخاب شود</string>
     <string name="settings_wallpaper_needs_pick_sub">اندروید پس از نصب دوباره یا جابه‌جایی برنامه، دسترسی به عکس را پاک می‌کند. برای حفظ پس‌زمینه آن را دوباره انتخاب کنید.</string>

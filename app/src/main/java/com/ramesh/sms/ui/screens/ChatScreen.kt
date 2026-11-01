@@ -110,6 +110,7 @@ import com.ramesh.sms.data.util.AppLanguage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import com.ramesh.sms.data.model.SmsMessage
+import com.ramesh.sms.data.util.foldSmsReactions
 import com.ramesh.sms.R
 import com.ramesh.sms.theme.AppearanceStore
 import com.ramesh.sms.theme.MessageAnimation
@@ -284,6 +285,10 @@ fun ChatScreen(
             }
         }
     }
+    // Reaction SMS ("Reacted 👍 to …") are attached to the message they quote, never shown as a
+    // bubble of their own. Computed on the merged list so paging cannot split a reaction from its
+    // target.
+    val foldedMessages = remember(state.messages) { foldSmsReactions(state.messages) }
     var reactionPickerMessageId by remember { mutableStateOf<Long?>(null) }
     val onShowInfoForSelected = remember(viewModel) {
         {
@@ -687,7 +692,11 @@ fun ChatScreen(
                 }
             } else {
                 ChatMessageList(
-                    messages = state.messages,
+                    // Fold reaction SMS onto the message they answer *here*, on the merged list.
+                    // The repository folds each provider page separately, so a reaction that is on
+                    // a later page than its target would otherwise reappear as its own bubble after
+                    // paging or a refresh.
+                    messages = foldedMessages,
                     availableSims = state.availableSims,
                     listState = listState,
                     highlightedMessageId = highlightedMessageId,
@@ -1037,13 +1046,12 @@ private fun ChatMessageList(
     // measures and re-measures while the provider list is being replaced underneath, and a reversed
     // view over a mutating list is what threw IndexOutOfBoundsException / ConcurrentModification.
     val reversedMessages = messages.reversed()
-    val animationStyle = look.messageAnimation
-    // The bubble that is allowed to play the entrance animation: the newest one. Remembering the
-    // ids that already played it (and resetting that memory whenever the style changes) means the
-    // chat replays the newest bubble after a style change instead of looking like the setting is
-    // dead, while scrolling still never turns the history into a slideshow.
+    // Opening and closing a conversation is animated by the "message animation" setting (see
+    // Navigation.kt). Inside an already open chat a brand-new bubble keeps a short, fixed entrance
+    // of its own so an arriving message does not just pop into place; history and re-bound rows
+    // start fully visible.
     val newestId = reversedMessages.firstOrNull()?.id
-    val alreadyAnimated = remember(animationStyle) { mutableSetOf<Long>() }
+    val alreadyAnimated = remember { mutableSetOf<Long>() }
 
     LazyColumn(
         state = listState,
@@ -1078,21 +1086,20 @@ private fun ChatMessageList(
             } else {
                 null
             }
-            // Only the newest bubble animates, and only the first time it is shown for the current
-            // style. Everything else (history, rows re-bound after a scroll) starts fully visible,
-            // so the list can never come back stuck at alpha 0 or perform a slideshow.
-            val animateIn = animationStyle != MessageAnimation.NONE &&
-                message.id !in alreadyAnimated &&
+            // Only the newest bubble animates, and only the first time it is shown. Everything else
+            // (history, rows re-bound after a scroll) starts fully visible, so the list can never
+            // come back stuck at alpha 0 or perform a slideshow.
+            val animateIn = message.id !in alreadyAnimated &&
                 (message.id == newestId ||
                     System.currentTimeMillis() - message.date < FRESH_BUBBLE_WINDOW_MS)
-            val bubbleVisible = remember(message.id, animationStyle) {
+            val bubbleVisible = remember(message.id) {
                 MutableTransitionState(!animateIn).apply { targetState = true }
             }
-            LaunchedEffect(message.id, animationStyle) { alreadyAnimated.add(message.id) }
+            LaunchedEffect(message.id) { alreadyAnimated.add(message.id) }
             AnimatedVisibility(
                 visibleState = bubbleVisible,
-                enter = messageEnterTransition(animationStyle),
-                exit = messageExitTransition(animationStyle)
+                enter = messageEnterTransition(MessageAnimation.SLIDE),
+                exit = messageExitTransition(MessageAnimation.SLIDE)
             ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (headerText != null) {

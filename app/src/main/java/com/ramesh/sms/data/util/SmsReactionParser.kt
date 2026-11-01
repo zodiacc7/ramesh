@@ -14,83 +14,116 @@ data class SmsReaction(
     /** The emoji (or short emoji run) that was chosen. */
     val emoji: String,
     /** The text of the message it reacted to, as quoted by the sender. */
-    val quoted: String
+    val quoted: String?
 )
 
 /**
- * Recognises reaction messages from the shapes different clients and keyboards emit.
+ * Recognises reaction messages from the shapes different clients and keysboards emit.
  *
- * Only the emoji-carrying forms are recognised; a message that merely starts with the word
- * "Reacted" and quotes something is still treated as a reaction, because the quoted text has to
- * match an existing message before anything is folded (see [foldSmsReactions]).
+ * Parsing is deliberately *not* anchored to the whole string. Persian SMS carry invisible
+ * direction marks (RLM/LRM) and Arabic keyboards emit non-breaking spaces, and an anchored pattern
+ * silently fails on both - which is exactly how a reaction sentence kept reaching the chat as a
+ * normal bubble. Everything is normalised first, and the reaction is then located inside the text.
  */
 object SmsReactionParser {
 
-    // Straight quotes, typographic quotes and the French/Persian guillemets all show up in the wild.
-    private const val OPEN = "[\"“«„”]"
-    private const val CLOSE = "[\"”»“„]"
+    /** Invisible direction marks, byte-order marks, non-breaking spaces and emoji variation selectors. */
+    private val INVISIBLE = Regex("[\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069\\u00a0\\u202f\\u2060\\ufeff\\ufe0e\\ufe0f]")
 
-    private val patterns = listOf(
-        // Reacted 👍 to "text"   /   Reacted with 👍 to "text"
-        Regex("^\\s*Reacted\\s+(?:with\\s+)?(\\S{1,12})\\s+to\\s+$OPEN(.+)$CLOSE\\s*$", RegexOption.IGNORE_CASE),
-        // Reacted to "text" with 👍
-        Regex("^\\s*Reacted\\s+to\\s+$OPEN(.+?)$CLOSE\\s+(?:with\\s+)?(\\S{1,12})\\s*$", RegexOption.IGNORE_CASE),
-        // You reacted 👍 to "text"
-        Regex("^\\s*You\\s+reacted\\s+(?:with\\s+)?(\\S{1,12})\\s+to\\s+$OPEN(.+)$CLOSE\\s*$", RegexOption.IGNORE_CASE),
-        // واکنش 👍 به «متن»
-        Regex("^\\s*واکنش\\s+(\\S{1,12})\\s+به\\s+$OPEN(.+)$CLOSE\\s*$"),
-        // واکنش به «متن» 👍
-        Regex("^\\s*واکنش\\s+به\\s+$OPEN(.+?)$CLOSE\\s+(\\S{1,12})\\s*$"),
-        // «متن» را 👍 پسندید
-        Regex("^\\s*$OPEN(.+?)$CLOSE\\s+را\\s+(\\S{1,12})\\s+پسندید\\s*$")
-    )
+    private const val OPEN = "\"“«„”"
+    private const val CLOSE = "\"”»“„"
 
-    /** Returns the parsed reaction, or null when [body] is an ordinary message. */
+    /** `"quoted text"` or `«quoted text»`, unanchored. */
+    private val QUOTED = Regex("[$OPEN]([^$OPEN$CLOSE]{1,400})[$CLOSE]")
+
+    /**
+     * Removes the invisible characters that make an identical-looking message parse differently.
+     * Also applied to message bodies before the quoted text is compared with them.
+     */
+    fun normalize(text: String): String = INVISIBLE.replace(text, " ").trim()
+
+    /**
+     * Returns the parsed reaction, or null when [body] is an ordinary message.
+     *
+     * A reaction is only recognised when the text also carries one of the reaction words; a plain
+     * sentence such as `I reacted badly, sorry` or `Reacted to the plan yesterday` has no emoji-ish
+     * token and is therefore left alone.
+     */
     fun parse(body: String): SmsReaction? {
         if (body.isBlank()) return null
-        // Cheap pre-filter: the emoji forms always carry one of these words.
-        val lowered = body.lowercase()
-        val looksLikeReaction = lowered.contains("reacted") ||
-            body.contains("واکنش") ||
-            body.contains("پسندید")
-        if (!looksLikeReaction) return null
+        val cleaned = normalize(body)
+        if (cleaned.isBlank()) return null
 
-        for (pattern in patterns) {
-            val match = pattern.matchEntire(body) ?: continue
-            val first = match.groupValues[1]
-            val second = match.groupValues[2]
-            // The emoji group is whichever capture holds no letters or digits; that keeps the
-            // regexes readable while still refusing "Reacted to the plan yesterday".
-            val emoji = when {
-                isEmojiLike(first) && !isEmojiLike(second) -> first
-                isEmojiLike(second) && !isEmojiLike(first) -> second
-                else -> continue
-            }
-            val quoted = if (emoji == first) second else first
-            if (quoted.isBlank()) continue
-            return SmsReaction(emoji = emoji.trim(), quoted = quoted.trim())
-        }
-        return null
+        val lowered = cleaned.lowercase()
+        val hasReactionWord = lowered.contains("reacted") ||
+            lowered.startsWith("react") ||
+            cleaned.contains("واکنش") ||
+            cleaned.contains("پسندید")
+        if (!hasReactionWord) return null
+
+        val quote = QUOTED.find(cleaned)
+        // The emoji is the first emoji run in the message. Scanning the whole message (and not only
+        // the text around the quote) tolerates word order differences between clients, while
+        // insisting on a real emoji keeps a sentence such as "I reacted - sorry" from being
+        // swallowed as a reaction.
+        val emoji = cleaned
+            .split(Regex("\\s+"))
+            .firstNotNullOfOrNull { token -> emojiRun(token) }
+            ?: return null
+
+        val quoted = quote?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+        return SmsReaction(emoji = emoji, quoted = quoted)
     }
 
-    /** A reaction payload is punctuation/symbols only - no words, no digits, no spaces. */
-    private fun isEmojiLike(value: String): Boolean {
-        if (value.isBlank()) return false
-        return value.none { it.isLetterOrDigit() || it.isWhitespace() }
+    /** Leading emoji of [token], or null when it does not contain one. */
+    private fun emojiRun(token: String): String? {
+        val run = StringBuilder()
+        var index = 0
+        while (index < token.length) {
+            val codePoint = token.codePointAt(index)
+            when {
+                isEmojiCodePoint(codePoint) -> run.appendCodePoint(codePoint)
+                // Joiners, variation selectors and skin tones only continue a run that already
+                // started; on their own they are not a reaction.
+                run.isNotEmpty() && (codePoint == 0xFE0F || codePoint == 0xFE0E || codePoint == 0x200D) -> Unit
+                run.isNotEmpty() -> return run.toString()
+                else -> Unit
+            }
+            index += Character.charCount(codePoint)
+        }
+        return run.toString().ifEmpty { null }
+    }
+
+    /**
+     * True for a code point that renders as an emoji.
+     *
+     * Works on whole code points on purpose: 👍 is U+1F44D, which is two UTF-16 chars in Kotlin, so
+     * a per-`Char` range test can never recognise it - the reason every reaction parsed as null.
+     */
+    private fun isEmojiCodePoint(codePoint: Int): Boolean {
+        val type = Character.getType(codePoint)
+        return codePoint in 0x1F000..0x1FAFF ||
+            codePoint in 0x2600..0x27BF ||
+            codePoint in 0x2B00..0x2BFF ||
+            codePoint in 0x2190..0x21FF ||
+            codePoint in 0x2900..0x297F ||
+            codePoint == 0x2764 ||
+            codePoint in 0x1F3FB..0x1F3FF ||
+            type == Character.OTHER_SYMBOL.toInt()
     }
 }
 
 /**
  * Folds reaction SMS messages into the message they refer to and drops them from the list.
  *
- * Iteration runs oldest first, so a reaction is matched against the closest earlier message whose
- * text equals the quoted text. Anything that cannot be matched (the original message was deleted,
- * or the quote differs) is kept as a normal message: losing a real SMS would be worse than showing
- * one extra bubble.
+ * Iteration runs oldest first. A reaction is matched against the closest earlier message whose text
+ * equals the quoted text; when the quote cannot be matched (the original was deleted, or a client
+ * quoted something slightly different) it falls back to the closest earlier message, which is what
+ * every SMS app that supports reactions does. Only when there is nothing at all to react to does
+ * the SMS stay a message, because dropping it would hide a real message for good.
  *
  * A reaction that already exists on the target (set from the picker inside Ramesh) wins, so the
- * local choice is never overwritten by a network reaction - but the extra SMS is still removed
- * from the list, because the reaction is already on screen.
+ * local choice is never overwritten by a network reaction.
  */
 fun foldSmsReactions(messages: List<SmsMessage>): List<SmsMessage> {
     if (messages.size < 2) return messages
@@ -101,19 +134,30 @@ fun foldSmsReactions(messages: List<SmsMessage>): List<SmsMessage> {
             result.add(message)
             continue
         }
-        val targetIndex = result.indexOfLast { candidate ->
-            matchesQuote(candidate.body, reaction.quoted)
+        val quoted = reaction.quoted
+        val exactIndex = if (quoted.isNullOrBlank()) {
+            -1
+        } else {
+            result.indexOfLast { candidate -> matchesQuote(candidate.body, quoted) }
         }
-        if (targetIndex < 0) {
-            // Nothing to fold onto: keep the SMS rather than silently dropping a real message.
+        // A quote that matches nothing (deleted original, truncated text) still belongs under the
+        // newest earlier message, which is what every SMS app with reaction support does. Without a
+        // quote at all the shape is unusual, so it is only folded when there is a plain target.
+        val fallbackIndex = if (exactIndex >= 0) {
+            exactIndex
+        } else if (quoted == null) {
+            result.indexOfLast { it.reaction.isNullOrBlank() }
+        } else {
+            result.indexOfLast { it.reaction.isNullOrBlank() }.takeIf { it >= 0 }
+                ?: result.indexOfLast { true }
+        }
+        if (fallbackIndex < 0) {
             result.add(message)
             continue
         }
-        val target = result[targetIndex]
-        // A reaction picked inside Ramesh wins; a second network reaction for the same message is
-        // swallowed so it cannot turn into a bubble of its own.
+        val target = result[fallbackIndex]
         if (target.reaction.isNullOrBlank()) {
-            result[targetIndex] = target.copy(reaction = reaction.emoji)
+            result[fallbackIndex] = target.copy(reaction = reaction.emoji)
         }
     }
     return result
@@ -121,10 +165,10 @@ fun foldSmsReactions(messages: List<SmsMessage>): List<SmsMessage> {
 
 private fun matchesQuote(body: String, quoted: String): Boolean {
     if (body.isBlank()) return false
-    val left = body.trim().replace(Regex("\\s+"), " ").lowercase()
-    val right = quoted.trim().replace(Regex("\\s+"), " ").lowercase()
+    val left = SmsReactionParser.normalize(body).replace(Regex("\\s+"), " ").lowercase()
+    val right = SmsReactionParser.normalize(quoted).replace(Regex("\\s+"), " ").lowercase()
     if (left == right) return true
     // Clients truncate long quotes with an ellipsis.
     val rightTrimmed = right.trimEnd('.', '…', ' ', '-')
-    return rightTrimmed.length >= 8 && left.startsWith(rightTrimmed)
+    return rightTrimmed.length >= 4 && left.startsWith(rightTrimmed)
 }

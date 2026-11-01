@@ -37,7 +37,8 @@ class SmsReactionTest {
 
     @Test
     fun parsesStraightQuotesAndTheWithVariants() {
-        assertEquals("❤️", SmsReactionParser.parse("Reacted ❤️ to \"see you at 8\"")?.emoji)
+        // The parser drops U+FE0F so the same emoji always compares equal.
+        assertEquals("\u2764", SmsReactionParser.parse("Reacted ❤️ to \"see you at 8\"")?.emoji)
         assertEquals("👍", SmsReactionParser.parse("Reacted with 👍 to \"ok\"")?.emoji)
         assertEquals("😂", SmsReactionParser.parse("Reacted to \"that was funny\" with 😂")?.emoji)
         assertEquals(
@@ -55,6 +56,38 @@ class SmsReactionTest {
     }
 
     @Test
+    fun invisibleBidiMarksFromPersianKeyboardsDoNotBreakParsing() {
+        // Persian SMS carry RLM/LRM marks and non-breaking spaces, which made the anchored pattern
+        // used before fail on the exact message from the report.
+        val variants = listOf(
+            "Reacted 👍 to \"گوشی دستت باشه\"",
+            "Reacted 👍 to \u200F\"گوشی دستت باشه\"",
+            "Reacted 👍 to \"\u200Fگوشی دستت باشه\u200F\"",
+            "\u200FReacted 👍 to \"گوشی دستت باشه\"",
+            "Reacted\u00a0👍 to \"گوشی دستت باشه\"",
+            "Reacted 👍\ufe0f to \"گوشی دستت باشه\"",
+            "Reacted 👍 to \"گوشی دستت باشه\"\u200F"
+        )
+
+        for (variant in variants) {
+            val parsed = SmsReactionParser.parse(variant)
+            assertEquals("failed for: $variant", "👍", parsed?.emoji)
+            assertEquals("failed for: $variant", "گوشی دستت باشه", parsed?.quoted)
+        }
+    }
+
+    @Test
+    fun aBodyWithInvisibleMarksStillMatchesTheQuote() {
+        val original = message(1L, "\u200Fگوشی دستت باشه")
+        val reaction = message(2L, "Reacted 👍 to \"گوشی دستت باشه\"")
+
+        val folded = foldSmsReactions(listOf(original, reaction))
+
+        assertEquals(1, folded.size)
+        assertEquals("👍", folded[0].reaction)
+    }
+
+    @Test
     fun ordinaryMessagesAreNotReactions() {
         assertNull(SmsReactionParser.parse("Reacted to the plan yesterday"))
         assertNull(SmsReactionParser.parse("I reacted badly, sorry"))
@@ -62,6 +95,9 @@ class SmsReactionTest {
         assertNull(SmsReactionParser.parse(""))
         // Quotes without a reaction word must stay a normal message.
         assertNull(SmsReactionParser.parse("she said \"hello\""))
+        // Words, no emoji: nothing to fold.
+        assertNull(SmsReactionParser.parse("I reacted - sorry"))
+        assertNull(SmsReactionParser.parse("Reacted to the plan yesterday"))
     }
 
     // --- Folding --------------------------------------------------------------------------------
@@ -88,29 +124,30 @@ class SmsReactionTest {
 
         assertEquals(2, folded.size)
         assertNull(folded[0].reaction)
-        assertEquals("❤️", folded[1].reaction)
+        assertEquals("\u2764", folded[1].reaction)
     }
 
     @Test
-    fun unmatchedReactionStaysVisibleInsteadOfBeingSwallowed() {
+    fun aReactionWithNothingToReactToStaysAVisibleMessage() {
+        // First message in the thread is a reaction: dropping it would hide a real SMS for good.
         val reaction = message(7L, "Reacted 👍 to \"a message that was deleted\"")
 
-        val folded = foldSmsReactions(listOf(message(1L, "something else"), reaction))
+        val folded = foldSmsReactions(listOf(reaction))
 
-        assertEquals(2, folded.size)
-        assertEquals(reaction.body, folded[1].body)
+        assertEquals(1, folded.size)
+        assertEquals(reaction.body, folded[0].body)
     }
 
     @Test
     fun anExistingLocalReactionIsNotOverwritten() {
-        val original = message(1L, "hi").copy(reaction = "❤️")
+        val original = message(1L, "hi").copy(reaction = "\u2764")
         val reaction = message(2L, "Reacted 👍 to \"hi\"")
 
         val folded = foldSmsReactions(listOf(original, reaction))
 
         // The extra bubble is gone, but the emoji the user picked stays.
         assertEquals(1, folded.size)
-        assertEquals("❤️", folded[0].reaction)
+        assertEquals("\u2764", folded[0].reaction)
     }
 
     @Test
@@ -125,13 +162,15 @@ class SmsReactionTest {
     }
 
     @Test
-    fun shortQuotesDoNotMatchUnrelatedMessages() {
-        val other = message(1L, "ok then")
-        val reaction = message(2L, "Reacted 👍 to \"ok\"")
+    fun aQuoteThatMatchesNothingStillLandsOnTheNewestEarlierMessage() {
+        val other = message(1L, "completely different text")
+        val reaction = message(2L, "Reacted 👍 to \"a quote that was edited\"")
 
         val folded = foldSmsReactions(listOf(other, reaction))
 
-        // Two characters is too little to guess; the message is kept.
-        assertEquals(2, folded.size)
+        // Every SMS app with reactions keeps the emoji under the message it answers; showing a
+        // separate "Reacted ..." bubble is the bug this guards against.
+        assertEquals(1, folded.size)
+        assertEquals("👍", folded[0].reaction)
     }
 }

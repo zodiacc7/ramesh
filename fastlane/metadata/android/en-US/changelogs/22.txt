@@ -1,0 +1,2 @@
+- Reactions sent as text ("Reacted 👍 to …") now really stay attached to the message they answer: the parser was confused by the invisible direction marks that Persian SMS contain, which is why the reaction still appeared as its own bubble.
+- Message animation is what its name promised: it now changes how conversations and other screens open and close (slide, fade, pop or nothing), with a live preview on the setting row.
