@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,9 +69,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,8 +99,8 @@ import com.ramesh.sms.theme.bubbleBackground
 import com.ramesh.sms.theme.bubbleContent
 import com.ramesh.sms.theme.bubbleContentBottomPadding
 import com.ramesh.sms.theme.chatBubbleShape
-import com.ramesh.sms.theme.messageEnterTransition
-import com.ramesh.sms.theme.messageExitTransition
+import com.ramesh.sms.theme.conversationEnterTransition
+import com.ramesh.sms.theme.conversationExitTransition
 import com.ramesh.sms.ui.components.AccentSwatchPicker
 import com.ramesh.sms.ui.components.ChatDateHeader
 import com.ramesh.sms.ui.components.SettingsActionRow
@@ -824,47 +828,83 @@ fun SettingsScreen(
 }
 
 /**
- * Plays the chosen message animation next to the picker itself.
+ * Plays the chosen animation next to the picker itself.
  *
- * Changing the setting used to do nothing visible: the conversation preview sits at the top of the
- * settings list and is recycled while the user is scrolled down to this row. Tap the row to replay.
+ * The setting is about entering and leaving a conversation, so the preview is a miniature screen
+ * that slides/fades/scales in - exactly what happens when the user opens a chat. It used to show a
+ * bubble, which made a "conversation transition" setting look like it did nothing.
  */
 @Composable
 private fun AnimationPreviewRow(look: Appearance) {
     var replay by remember { mutableIntStateOf(0) }
     // Replay on every change, including the very first composition, so the row always demonstrates
-    // the current style instead of showing a static bubble.
+    // the current choice instead of showing a static picture.
     LaunchedEffect(look.messageAnimation) { replay++ }
+    val style = look.messageAnimation
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clickable { replay++ },
-        verticalAlignment = Alignment.CenterVertically
+            .clickable { replay++ }
     ) {
-        Box(modifier = Modifier.weight(1f)) {
-            // PreviewAnimatedSlot owns the AnimatedVisibility call: the RowScope overload of
-            // AnimatedVisibility would otherwise shadow the plain one inside this Box.
-            PreviewAnimatedSlot(replay, look) {
-                Surface(
-                    shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
-                    color = look.receivedTone.bubbleBackground(false)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(SquircleCardShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            PreviewConversationSlot(replay = replay, style = style, rtl = rtl) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = stringResource(R.string.settings_animation_preview_bubble),
+                        text = stringResource(R.string.settings_animation_preview_page),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = look.receivedTone.bubbleContent(false),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         }
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = stringResource(R.string.settings_animation_replay),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary
         )
+    }
+}
+
+/**
+ * Runs a screen transition inside a small preview box.
+ *
+ * Kept as its own composable so the `AnimatedVisibility` call never resolves to the
+ * `RowScope`/`ColumnScope` extension, which needs an explicit receiver.
+ */
+@Composable
+private fun PreviewConversationSlot(
+    replay: Int,
+    style: MessageAnimation,
+    rtl: Boolean,
+    content: @Composable () -> Unit
+) {
+    val state = remember(replay, style) {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+    AnimatedVisibility(
+        visibleState = state,
+        enter = conversationEnterTransition(style, forward = true, rtl = rtl),
+        exit = conversationExitTransition(style, forward = true, rtl = rtl)
+    ) {
+        content()
     }
 }
 
@@ -892,7 +932,7 @@ private fun BubblePreviewCard(look: Appearance) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             ChatDateHeader(text = stringResource(R.string.settings_today))
-            PreviewAnimatedSlot(replay, look) {
+            ConversationPreviewSlotForCard(replay, look) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Surface(
                         shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
@@ -922,7 +962,7 @@ private fun BubblePreviewCard(look: Appearance) {
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            PreviewAnimatedSlot(replay, look) {
+            ConversationPreviewSlotForCard(replay, look) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -954,22 +994,17 @@ private fun BubblePreviewCard(look: Appearance) {
     }
 }
 
-/**
- * Plays the selected message animation inside the settings preview.
- *
- * The chat only animates messages younger than 15 seconds, so without this the picker looked like
- * it did nothing until the next SMS arrived.
- */
+/** Replays the screen transition inside the conversation preview card when it is tapped. */
 @Composable
-private fun PreviewAnimatedSlot(replay: Int, look: Appearance, content: @Composable () -> Unit) {
-    val state = remember(replay) {
-        MutableTransitionState(false).apply { targetState = true }
-    }
-    AnimatedVisibility(
-        visibleState = state,
-        enter = messageEnterTransition(look.messageAnimation),
-        exit = messageExitTransition(look.messageAnimation)
-    ) {
-        content()
-    }
+private fun ConversationPreviewSlotForCard(
+    replay: Int,
+    look: Appearance,
+    content: @Composable () -> Unit
+) {
+    PreviewConversationSlot(
+        replay = replay,
+        style = look.messageAnimation,
+        rtl = LocalLayoutDirection.current == LayoutDirection.Rtl,
+        content = content
+    )
 }

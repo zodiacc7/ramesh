@@ -7,16 +7,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 
 /**
- * Enter animation for a message bubble.
+ * Enter animation for a bubble that arrives while its conversation is already open.
  *
- * The three styles have to be told apart at a glance - an earlier version moved the bubble by a
- * third of its height in 200 ms, which is indistinguishable from a fade on a phone, so the setting
- * looked broken. Each style now has a clearly different shape and duration, and still stays short
- * enough that a burst of incoming messages never turns into a slideshow.
+ * This is not what the "message animation" setting controls - that one animates opening and closing
+ * a conversation (see [conversationEnterTransition]). A bubble keeps a short, fixed entrance so an
+ * incoming message does not simply pop into place.
  */
 fun messageEnterTransition(style: MessageAnimation): EnterTransition = when (style) {
     MessageAnimation.FADE -> fadeIn(tween(220))
@@ -36,3 +37,48 @@ fun messageExitTransition(style: MessageAnimation): ExitTransition = when (style
         scaleOut(animationSpec = tween(150), targetScale = 0.85f) + fadeOut(tween(120))
     MessageAnimation.NONE -> ExitTransition.None
 }
+
+/**
+ * Transition used when a screen (a conversation, settings, the composer) enters or leaves.
+ *
+ * This is what the "message animation" setting actually controls: how opening and closing a
+ * conversation looks. `forward = false` mirrors the animation for a back navigation, and it is
+ * also flipped for right-to-left layouts by the caller.
+ */
+fun conversationEnterTransition(
+    style: MessageAnimation,
+    forward: Boolean,
+    rtl: Boolean = false
+): EnterTransition {
+    val sign = if (forward != rtl) 1f else -1f
+    return when (style) {
+        MessageAnimation.FADE -> fadeIn(tween(PageTransitionMillis))
+        MessageAnimation.SLIDE -> slideInHorizontally(tween(PageTransitionMillis)) { full ->
+            (full * sign).toInt()
+        } + fadeIn(tween(PageTransitionMillis))
+        MessageAnimation.POP -> scaleIn(tween(PageTransitionMillis), initialScale = 0.92f) +
+            fadeIn(tween(PageTransitionMillis))
+        MessageAnimation.NONE -> EnterTransition.None
+    }
+}
+
+/** Mirror of [conversationEnterTransition]: the outgoing screen leaves on the other side. */
+fun conversationExitTransition(
+    style: MessageAnimation,
+    forward: Boolean,
+    rtl: Boolean = false
+): ExitTransition {
+    val sign = if (forward != rtl) -1f else 1f
+    return when (style) {
+        MessageAnimation.FADE -> fadeOut(tween(PageTransitionMillis))
+        MessageAnimation.SLIDE -> slideOutHorizontally(tween(PageTransitionMillis)) { full ->
+            (full * sign).toInt()
+        } + fadeOut(tween(PageTransitionMillis))
+        MessageAnimation.POP -> scaleOut(tween(PageTransitionMillis), targetScale = 0.94f) +
+            fadeOut(tween(PageTransitionMillis))
+        MessageAnimation.NONE -> ExitTransition.None
+    }
+}
+
+/** Duration of a screen transition, shared by enter and exit so both directions feel identical. */
+const val PageTransitionMillis = 260

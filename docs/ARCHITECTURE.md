@@ -85,11 +85,20 @@ drops the affected verdicts so the next read re-evaluates.
 `cached_threads` is a snapshot that lets the inbox paint immediately on launch; it is replaced on
 every successful provider read.
 
+**The "message animation" setting is a navigation transition.** It decides how a conversation (or
+any other screen) enters and leaves - slide, fade, pop or none - through
+`conversationEnterTransition`/`conversationExitTransition`, which `NavDisplay` uses for both the
+push and the pop transition and which mirror themselves for RTL. A bubble that arrives while the
+conversation is already open keeps a short fixed entrance of its own.
+
 **Reactions arrive as SMS.** Clients with no reaction protocol send the reaction as text
-(`Reacted 👍 to "see you at 8"`). `SmsReactionParser` recognises the shapes (English, Persian,
-straight/typographic quotes, guillemets) and `foldSmsReactions` moves the emoji onto the closest
-earlier message whose text matches the quote, removing the extra SMS from the conversation. An
-unmatched reaction is kept as a normal message rather than dropped, and a reaction picked inside
+(`Reacted 👍 to "see you at 8"`). `SmsReactionParser` normalises the body first (Persian SMS carry
+invisible RLM/LRM marks and keyboards emit non-breaking spaces, which made an anchored pattern fail)
+and then looks for a reaction word, an emoji and a quoted text. `foldSmsReactions` moves the emoji
+onto the closest earlier message whose text matches the quote, falling back to the newest earlier
+message when the quote no longer matches, and removes the extra SMS from the conversation. Folding
+runs on the *merged* list in `ChatScreen`, so paging or a refresh can never split a reaction from
+its target. A reaction with nothing to react to stays a normal message, and a reaction picked inside
 Ramesh is never overwritten by a network one.
 
 **Silent spam is counted, never notified.** Spam is stored read, so it can never appear in a
