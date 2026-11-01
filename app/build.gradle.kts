@@ -37,8 +37,8 @@ android {
         applicationId = "com.ramesh.sms"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1000
-        versionName = "1.0.0"
+        versionCode = 1011
+        versionName = "1.0.1"
     }
 
     signingConfigs {
@@ -88,6 +88,12 @@ android {
         includeInApk = false
         includeInBundle = false
     }
+
+    testOptions {
+        // Robolectric needs the merged resources and manifest to start an app context on the JVM,
+        // which is what lets the database helper be tested without an emulator.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 kotlin {
@@ -124,9 +130,12 @@ dependencies {
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-  // Local tests: jUnit, coroutines, Android runner
+  // Local tests: jUnit, coroutines, and Robolectric so the repository and the SQLite helper can be
+  // exercised on the JVM (a real Android app context backed by Robolectric's SQLite, no emulator).
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.robolectric)
+  testImplementation(libs.androidx.test.core.ktx)
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)

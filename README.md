@@ -4,7 +4,7 @@
 
 [English](#english) · [فارسی](#farsi)
 
-[![Version](https://img.shields.io/badge/version-1.0.0_(1000)-blue.svg)](https://github.com/zodiacc7/ramesh/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.0.1_(1011)-blue.svg)](https://github.com/zodiacc7/ramesh/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3ddc84.svg)](https://developer.android.com/about/versions/oreo)
 
@@ -25,7 +25,7 @@ get through.
 > Ramesh is an independent app published under the `com.ramesh.sms` package id as a free
 > (GPL-3.0) open-source project.
 
-**Current release: 1.0.0 (build 1000).** Release notes live on the
+**Latest stable: 1.0.0 (build 1000); 1.0.1 (build 1011) is a pre-release.** Release notes live on the
 [releases page](https://github.com/zodiacc7/ramesh/releases) and in
 [`fastlane/metadata/android/en-US/changelogs/`](fastlane/metadata/android/en-US/changelogs);
 design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the open audit in
@@ -122,7 +122,8 @@ Then add the pattern in Filter Studio as a blocklist rule.
 ### Install
 
 1. Download the signed `ramesh-<version>-universal.apk` from
-   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) (latest: **1.0.0**, build 1000).
+   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) (latest stable: **1.0.0**, build 1000;
+   pre-release: **1.0.1**, build 1011).
 2. Install it and open Ramesh.
 3. Grant SMS, contacts and notification permissions.
 4. Accept the prompt to become the default SMS app.
@@ -171,7 +172,7 @@ Requirements: **JDK 21** and the **Android SDK (API 36)**.
 
 ```bash
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew test               # unit tests (filter engine, OTP detector, dates, prefs)
+./gradlew test               # unit tests (filter engine, inbox snapshot, database cache, OTP, dates, prefs)
 ./gradlew assembleRelease    # needs the signing environment variables below
 ```
 
@@ -238,7 +239,7 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 
 > رامش برنامه‌ای مستقل با شناسهٔ بستهٔ `com.ramesh.sms` و پروانهٔ آزاد GPL-3.0 است.
 
-**نسخهٔ فعلی: ۱.۰.۰ (بیلد ۱۰۰۰).** یادداشت نسخه‌ها در
+**آخرین نسخهٔ پایدار: ۱.۰.۰ (بیلد ۱۰۰۰)؛ نسخهٔ ۱.۰.۱ (بیلد ۱۰۱۱) پیش‌انتشار است.** یادداشت نسخه‌ها در
 [صفحهٔ ریلیزها](https://github.com/zodiacc7/ramesh/releases) و پوشهٔ
 [`fastlane/metadata/android/fa-IR/changelogs/`](fastlane/metadata/android/fa-IR/changelogs) است؛
 مستندهای طراحی در [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) و بازبینی در
@@ -333,8 +334,8 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 ### نصب
 
 ۱. فایل امضاشدهٔ `ramesh-<version>-universal.apk` را از
-   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) دانلود کنید (آخرین نسخه: **۱.۰.۰**،
-   بیلد ۱۰۰۰).
+   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) دانلود کنید (آخرین نسخهٔ پایدار: **۱.۰.۰**،
+   بیلد ۱۰۰۰؛ پیش‌انتشار: **۱.۰.۱**، بیلد ۱۰۱۱).
 ۲. نصب کنید و رامش را باز کنید.
 ۳. دسترسی پیامک، مخاطبین و اعلان را بدهید.
 ۴. درخواست «برنامهٔ پیامک پیش‌فرض» را بپذیرید.
@@ -382,7 +383,7 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 
 ```bash
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew test               # تست‌های واحد موتور فیلتر، تشخیص OTP، تاریخ و تنظیمات
+./gradlew test               # تست‌های واحد موتور فیلتر، صندوق ورودی، کش پایگاه داده، تشخیص OTP، تاریخ و تنظیمات
 ./gradlew assembleRelease    # نیازمند متغیرهای امضای زیر
 ```
 
