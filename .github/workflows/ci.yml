@@ -78,8 +78,32 @@ jobs:
         run: |
           if [ -f build.log ]; then
             tr -d '\r' < build.log > build-clean.log
-            grep -E '^e: |^FAILURE: |What went wrong|Execution failed for task|Could not (resolve|find|open)|Unresolved reference' build-clean.log \
+            grep -E '^e: |^FAILURE: |What went wrong|Execution failed for task|Could not (resolve|find|open)|Unresolved reference|FAILED$' build-clean.log \
               | head -n 50 \
               | sed 's/%/%25/g' \
               | awk '{ printf "::error::%s\n", $0 }'
+          fi
+
+      # A failing unit test only names the task in the Gradle log ("Execution failed for task
+      # ':app:testDebugUnitTest'"), which makes the actual assertion impossible to find without
+      # downloading logs. Print the failing test cases with their message as annotations.
+      - name: Report failing unit tests
+        if: failure()
+        run: |
+          python3 - <<'PY' > failing-tests.txt
+          import glob, xml.etree.ElementTree as ET
+          for report in glob.glob('app/build/test-results/testDebugUnitTest/*.xml'):
+              try:
+                  root = ET.parse(report).getroot()
+              except Exception:
+                  continue
+              for case in root.iter('testcase'):
+                  for failure in case.findall('failure'):
+                      message = (failure.get('message') or '').strip().split('\n')[0][:200]
+                      print(f"{case.get('classname')}.{case.get('name')}: {message}")
+          PY
+          if [ -s failing-tests.txt ]; then
+            head -n 30 failing-tests.txt | sed 's/%/%25/g' | awk '{ printf "::error::%s\n", $0 }'
+          else
+            echo "::error::No failing test cases were reported (the task may have failed to start)"
           fi
