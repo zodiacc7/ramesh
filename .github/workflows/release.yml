@@ -54,21 +54,23 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Preferred: keystore provided as a secret. Fallback: the checked-in
-      # keystore/keystore.properties, so a fresh clone can still publish a signed build.
+      # The key is never in the repository. See keystore/README.md for the secret names and how to
+      # restore them; without them we refuse to build rather than publish an unsigned APK.
       - name: Prepare signing keystore
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
         run: |
-          if [[ -n "$SIGNING_KEYSTORE" ]]; then
-            echo "$SIGNING_KEYSTORE" | tr -d '\n\r ' | base64 --decode > "$RUNNER_TEMP/ramesh-release.p12"
-            test -s "$RUNNER_TEMP/ramesh-release.p12"
-            echo "SIGNING_STORE_FILE=$RUNNER_TEMP/ramesh-release.p12" >> "$GITHUB_ENV"
-            echo "SIGNING_STORE_TYPE=PKCS12" >> "$GITHUB_ENV"
-          else
-            echo "::warning::SIGNING_KEYSTORE secret is not set; using keystore/keystore.properties"
-            test -f keystore/ramesh-release.p12
+          if [[ -z "$SIGNING_KEYSTORE" ]]; then
+            echo "::error::SIGNING_KEYSTORE secret is not set. Add the four signing secrets documented in keystore/README.md."
+            exit 1
           fi
+          echo "$SIGNING_KEYSTORE" | tr -d '\n\r ' | base64 --decode > "$RUNNER_TEMP/ramesh-release.p12"
+          if [[ ! -s "$RUNNER_TEMP/ramesh-release.p12" ]]; then
+            echo "::error::SIGNING_KEYSTORE did not decode to a keystore file."
+            exit 1
+          fi
+          echo "SIGNING_STORE_FILE=$RUNNER_TEMP/ramesh-release.p12" >> "$GITHUB_ENV"
+          echo "SIGNING_STORE_TYPE=PKCS12" >> "$GITHUB_ENV"
 
       - name: Build signed release APK
         env:

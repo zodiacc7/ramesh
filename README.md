@@ -139,9 +139,10 @@ Requirements: **JDK 21** and the **Android SDK (API 36)**.
 ./gradlew assembleRelease    # needs the signing environment variables below
 ```
 
-Release builds are signed with `keystore/ramesh-release.p12` (see [keystore/README.md](keystore/README.md)).
-The environment variables `SIGNING_STORE_FILE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`,
-`SIGNING_KEY_PASSWORD` and `SIGNING_STORE_TYPE` override the checked-in key when set.
+Release builds are signed with a key that is **not** in this repository: CI reads it from the
+`SIGNING_KEYSTORE` GitHub secret. To build a signed release locally, point the environment variables
+`SIGNING_STORE_FILE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` and
+`SIGNING_STORE_TYPE` at your own copy of the key. See [keystore/README.md](keystore/README.md).
 
 ### Project structure
 
@@ -309,10 +310,11 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 ./gradlew assembleRelease    # نیازمند متغیرهای امضای زیر
 ```
 
-نسخهٔ انتشار با کلید `keystore/ramesh-release.p12` امضا می‌شود (جزئیات در
-[keystore/README.md](keystore/README.md)). متغیرهای محیطی `SIGNING_STORE_FILE`،
-`SIGNING_STORE_PASSWORD`، `SIGNING_KEY_ALIAS`، `SIGNING_KEY_PASSWORD` و `SIGNING_STORE_TYPE`
-در صورت وجود، جای کلید داخل مخزن را می‌گیرند.
+نسخهٔ انتشار با کلیدی امضا می‌شود که **داخل این مخزن نیست**؛ CI آن را از secret با نام
+`SIGNING_KEYSTORE` می‌خواند. برای ساخت نسخهٔ امضاشده روی سیستم خودت، متغیرهای محیطی
+`SIGNING_STORE_FILE`، `SIGNING_STORE_PASSWORD`، `SIGNING_KEY_ALIAS`، `SIGNING_KEY_PASSWORD` و
+`SIGNING_STORE_TYPE` را به نسخهٔ شخصی کلید اشاره بده. جزئیات در
+[keystore/README.md](keystore/README.md).
 
 ### ساختار پروژه
 

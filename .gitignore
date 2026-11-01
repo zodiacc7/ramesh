@@ -47,6 +47,10 @@ local.properties
 # Keystore files
 *.jks
 *.keystore
+# Release signing material lives in GitHub Actions secrets, never in the repo.
+keystore/*.p12
+keystore/*.jks
+keystore/keystore.properties
 
 # External native build folder
 .externalNativeBuild/

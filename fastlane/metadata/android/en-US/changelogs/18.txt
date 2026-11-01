@@ -1,0 +1,1 @@
+- Security: the release signing key and its passwords are no longer stored in the repository. CI now reads them from encrypted GitHub Actions secrets, and a release build fails loudly instead of publishing an unsigned APK.
