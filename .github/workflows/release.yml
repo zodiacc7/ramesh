@@ -7,6 +7,11 @@ on:
       # Stable tags (1.0.0) and beta tags (1.1.0-beta.1) both build a signed APK.
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+-*"
+    # ...but a "-pre" tag belongs to the Pre-release workflow, which publishes it with
+    # --prerelease --latest=false. Without this, publishing a pre-release also started this
+    # workflow, whose "tag must equal versionName" guard then failed on every pre-release.
+    tags-ignore:
+      - "*-pre"
 
 permissions:
   contents: write

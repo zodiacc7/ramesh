@@ -161,7 +161,11 @@ the package id `com.ramesh.sms.dev`, so it installs next to the regular app.
 
 **Signed releases.** Pushing a tag that matches `versionName` (for example `1.0.0`) runs the
 release workflow, which builds, signs and publishes `ramesh-<version>-universal.apk` together with
-its SHA-256 checksum.
+its SHA-256 checksum and the bilingual release notes from `fastlane/metadata`.
+
+**Pre-releases.** A `-pre` tag (for example `1.0.1-pre`, with `versionName = "1.0.1"`) runs the
+pre-release workflow instead. It signs the same APK but publishes it with `--prerelease` and
+`--latest=false`, so a pre-release never replaces the latest stable release.
 
 > Ramesh is distributed through GitHub Releases; there is no F-Droid listing for
 > `com.ramesh.sms` yet.
@@ -372,7 +376,12 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 بستهٔ آن `com.ramesh.sms.dev` است، پس کنار نسخهٔ معمولی نصب می‌شود.
 
 **نسخه‌های امضاشده.** با زدن تگی هم‌نام با `versionName` (مثلاً `1.0.0`) گردش‌کار انتشار اجرا
-می‌شود و فایل امضاشدهٔ `ramesh-<version>-universal.apk` همراه با چک‌سام SHA-256 منتشر می‌شود.
+می‌شود: فایل `ramesh-<version>-universal.apk` ساخته، امضا و همراه با چکیدهٔ SHA-256 و یادداشت‌های
+دوزبانهٔ نسخه (از `fastlane/metadata`) منتشر می‌شود.
+
+**پیش‌انتشارها.** تگ‌های `-pre` (مثلاً `1.0.1-pre` با `versionName = "1.0.1"`) گردش‌کار پیش‌انتشار را
+اجرا می‌کنند: همان فایل امضاشده با پرچم‌های `--prerelease` و `--latest=false` منتشر می‌شود، پس هیچ
+پیش‌انتشاری جای «آخرین نسخهٔ پایدار» را نمی‌گیرد.
 
 > رامش از طریق GitHub Releases منتشر می‌شود و هنوز صفحه‌ای در F-Droid برای بستهٔ
 > `com.ramesh.sms` وجود ندارد.
