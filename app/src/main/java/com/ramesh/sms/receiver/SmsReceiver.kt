@@ -29,6 +29,9 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "SmsReceiver"
 
+/** Broadcast sent to the UI when a new SMS is stored, so it can reload immediately. */
+const val ACTION_NEW_SMS_RECEIVED = "com.ramesh.sms.NEW_SMS_RECEIVED"
+
 class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -133,6 +136,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
         val pendingMetaWrites = mutableListOf<SpamMetaWrite>()
         val threadsToPrune = mutableSetOf<Long>()
+        var storedAnyMessage = false
 
         for (entry in messagesBySender) {
             val parts = entry.parts
@@ -182,6 +186,7 @@ class SmsReceiver : BroadcastReceiver() {
                     val uri = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, cv)
                     if (uri != null) {
                         storedInProvider = true
+                        storedAnyMessage = true
                         uri.lastPathSegment?.toLongOrNull()?.let { insertedId ->
                             messageId = insertedId
                         }
@@ -196,6 +201,7 @@ class SmsReceiver : BroadcastReceiver() {
                 resolveInboxMessageId(context, sender, fullBody, timestamp)?.let { realId ->
                     messageId = realId
                     storedInProvider = true
+                    storedAnyMessage = true
                 }
             }
 
@@ -243,6 +249,12 @@ class SmsReceiver : BroadcastReceiver() {
 
         // Optional per-conversation cap: drop the oldest messages once a thread is full.
         threadsToPrune.forEach { id -> smsRepository.pruneThread(id) }
+
+        // Notify the UI so it reloads the thread list immediately instead of waiting for
+        // a ContentObserver that may not fire on all Android versions.
+        if (storedAnyMessage) {
+            context.sendBroadcast(Intent(ACTION_NEW_SMS_RECEIVED))
+        }
     }
 
     private suspend fun resolveInboxMessageId(

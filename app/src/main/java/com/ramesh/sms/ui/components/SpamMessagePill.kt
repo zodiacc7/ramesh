@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ramesh.sms.R
 import com.ramesh.sms.data.model.SmsMessage
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.SpamCardShape
 import com.ramesh.sms.theme.SpamWarningBorderDark
@@ -80,7 +81,8 @@ fun SpamMessagePill(
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onLongClick: () -> Unit = {},
-    onToggleSelect: () -> Unit = {}
+    onToggleSelect: () -> Unit = {},
+    appLanguage: AppLanguage = AppLanguage.SYSTEM,
 ) {
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) SpamWarningDark else SpamWarningLight
@@ -91,7 +93,9 @@ fun SpamMessagePill(
     var isRevealed by remember(message.isRevealed, isHighlighted) {
         mutableStateOf(if (isHighlighted) true else message.isRevealed)
     }
-    val dateText = remember(message.date, useShamsi) { SmsDateFormats.formatDate(message.date, useShamsi) }
+    val dateText = remember(message.date, useShamsi, appLanguage) {
+        SmsDateFormats.formatDate(message.date, useShamsi, appLanguage)
+    }
     val clockText = remember(message.date) { SmsDateFormats.clock(message.date) }
 
     Card(

@@ -1,0 +1,7 @@
+• Fixed: messages always appear — loading no longer gets stuck on empty inbox.
+• New messages appear immediately via SMS observer — no need to exit and re-enter.
+• Jalali calendar in English now shows correct order (e.g. "Shahrivar 23").
+• Long dates are numeric in all languages (e.g. 1404/03/23).
+• System back button now uses the same slide-and-fade animation as in-app back.
+• Undo snackbar after deleting a conversation now auto-dismisses after 5 seconds.
+• Undo button restores deleted conversation immediately.

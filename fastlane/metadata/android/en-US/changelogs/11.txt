@@ -1,0 +1,7 @@
+• Fixed: messages now always appear in the inbox — no more empty list after install or upgrade.
+• New messages appear immediately — no need to exit and re-enter the app.
+• Persian Shamsi dates: English UI shows compact numeric format (1404/03/23); Persian UI shows full format (۲۳ شهریور ۱۴۰۴).
+• Long dates always use numeric format (YYYY/MM/DD).
+• Send button is now a small pencil icon (Edit) for faster composition.
+• Message input and search field share the same clean, minimal style.
+• Entering and exiting a chat now use identical slide-and-fade animation.

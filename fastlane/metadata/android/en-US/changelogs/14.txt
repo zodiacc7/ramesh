@@ -1,0 +1,4 @@
+• Fixed: new SMS messages now appear immediately via ContentObserver reload
+• Fixed: swipe left/right on conversations now reliably reveals delete/mark-read actions
+• Fixed: undo snackbar after deleting a conversation now auto-dismisses after 5 seconds
+• Removed silent-load rate limit that delayed message refresh

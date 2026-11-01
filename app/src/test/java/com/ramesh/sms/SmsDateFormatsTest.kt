@@ -1,5 +1,6 @@
 package com.ramesh.sms
 
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.ui.util.SmsDateFormats
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -45,12 +46,12 @@ class SmsDateFormatsTest {
         val timestamp2026 = LocalDate.of(2026, 9, 13).atStartOfDay(zone).toInstant().toEpochMilli()
         val now2026 = LocalDate.of(2026, 9, 13).atStartOfDay(zone).toInstant().toEpochMilli()
 
-        val formattedCurrentYear = SmsDateFormats.shamsiDate(timestamp2026, now2026)
+        val formattedCurrentYear = SmsDateFormats.shamsiDate(timestamp2026, AppLanguage.PERSIAN, now2026)
         assertEquals("۲۲ شهریور", formattedCurrentYear)
 
         // Previous Shamsi year message: 2025-09-13 is in 1404
         val timestamp2025 = LocalDate.of(2025, 9, 13).atStartOfDay(zone).toInstant().toEpochMilli()
-        val formattedPastYear = SmsDateFormats.shamsiDate(timestamp2025, now2026)
+        val formattedPastYear = SmsDateFormats.shamsiDate(timestamp2025, AppLanguage.PERSIAN, now2026)
         assertEquals("۲۲ شهریور ۱۴۰۴", formattedPastYear)
     }
 
@@ -60,8 +61,8 @@ class SmsDateFormatsTest {
         val timestamp = LocalDate.of(2026, 9, 13).atStartOfDay(zone).toInstant().toEpochMilli()
         val now = LocalDate.of(2026, 9, 13).atStartOfDay(zone).toInstant().toEpochMilli()
 
-        val gregorian = SmsDateFormats.formatDate(timestamp, useShamsi = false, now = now)
-        val shamsi = SmsDateFormats.formatDate(timestamp, useShamsi = true, now = now)
+        val gregorian = SmsDateFormats.formatDate(timestamp, useShamsi = false, appLanguage = AppLanguage.PERSIAN, now = now)
+        val shamsi = SmsDateFormats.formatDate(timestamp, useShamsi = true, appLanguage = AppLanguage.PERSIAN, now = now)
 
         assertEquals("۲۲ شهریور", shamsi)
         assertTrue(gregorian.contains("13") || gregorian.contains("Sep"))
