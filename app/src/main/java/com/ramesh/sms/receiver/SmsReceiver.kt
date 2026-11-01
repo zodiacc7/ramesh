@@ -241,7 +241,9 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         if (pendingMetaWrites.isNotEmpty()) {
-            dbHelper.saveMessagesFilterMeta(pendingMetaWrites)
+            // countAsNewSpam: these verdicts belong to messages that just arrived, so a spam
+            // arrival must still raise the badges even though it never notifies.
+            dbHelper.saveMessagesFilterMeta(pendingMetaWrites, countAsNewSpam = true)
         }
 
         // Optional per-conversation cap: drop the oldest messages once a thread is full.

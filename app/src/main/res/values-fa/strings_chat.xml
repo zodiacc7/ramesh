@@ -17,4 +17,5 @@
     <string name="chat_close">بستن</string>
     <string name="chat_sending_in">ارسال در %1$d ثانیه</string>
     <string name="chat_sms_message">پیامک</string>
+    <string name="chat_composer_hint">پیام متنی (SMS)…</string>
 </resources>

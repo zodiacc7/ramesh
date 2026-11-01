@@ -84,6 +84,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 is_revealed INTEGER NOT NULL DEFAULT 0,
                 is_spam INTEGER NOT NULL DEFAULT 1,
                 action TEXT NOT NULL DEFAULT 'SPAM',
+                is_new INTEGER NOT NULL DEFAULT 0,
                 created_at INTEGER NOT NULL
             )
             """.trimIndent()
@@ -132,6 +133,16 @@ class RameshDatabaseHelper private constructor(context: Context) :
         } catch (_: Exception) {
             // column already present
         }
+        try {
+            db.execSQL("ALTER TABLE spam_message_meta ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0")
+        } catch (_: Exception) {
+            // column already present
+        }
+        try {
+            db.execSQL("ALTER TABLE cached_threads ADD COLUMN new_spam_count INTEGER NOT NULL DEFAULT 0")
+        } catch (_: Exception) {
+            // column already present
+        }
         if (predefinedRulesSeeded) return
         seedPredefinedRules(db)
         predefinedRulesSeeded = true
@@ -170,6 +181,12 @@ class RameshDatabaseHelper private constructor(context: Context) :
         if (oldVersion < 6) {
             try { createMessageReactionsTable(db) } catch (e: Exception) {}
             try { db.execSQL("ALTER TABLE sender_tabs ADD COLUMN filter_mask INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
+        }
+        if (oldVersion < 7) {
+            // Spam is delivered silently, but it still has to be countable: every spam verdict
+            // carries a "not looked at yet" flag that the tab badges read and the inbox clears.
+            try { db.execSQL("ALTER TABLE spam_message_meta ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
+            try { db.execSQL("ALTER TABLE cached_threads ADD COLUMN new_spam_count INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
         }
     }
 
@@ -523,7 +540,9 @@ class RameshDatabaseHelper private constructor(context: Context) :
      */
     suspend fun saveMessagesFilterMeta(
         entries: List<SpamMetaWrite>,
-        notify: Boolean = true
+        notify: Boolean = true,
+        /** False when the verdict is being refreshed for an old message rather than a new arrival. */
+        countAsNewSpam: Boolean = false
     ) = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext
         val db = writableDatabase
@@ -538,6 +557,9 @@ class RameshDatabaseHelper private constructor(context: Context) :
                     put("is_revealed", 0)
                     put("is_spam", if (entry.action == FilterAction.SPAM) 1 else 0)
                     put("action", entry.action.name)
+                    // Spam never reaches the notification shade, so the unread badges would stay
+                    // at zero. This flag is what the tab badges count.
+                    put("is_new", if (countAsNewSpam && entry.action == FilterAction.SPAM) 1 else 0)
                     put("created_at", now)
                 }
                 db.insertWithOnConflict(
@@ -705,6 +727,59 @@ class RameshDatabaseHelper private constructor(context: Context) :
         _spamMetaChanged.value = System.currentTimeMillis()
     }
 
+    /**
+     * Spam messages per sender that the user has not looked at yet.
+     *
+     * Spam is stored read (it never notifies), so it has no unread count of its own. These numbers
+     * are what the inbox tab badges add on top of [ConversationThread.unreadCount].
+     */
+    suspend fun getNewSpamCounts(): Map<String, Int> = withContext(Dispatchers.IO) {
+        val counts = mutableMapOf<String, Int>()
+        try {
+            readableDatabase.query(
+                "spam_message_meta",
+                arrayOf("address", "COUNT(*) AS new_count"),
+                "is_new = 1 AND is_spam = 1",
+                null,
+                "address",
+                null,
+                null
+            ).use { cursor ->
+                val addressIdx = cursor.getColumnIndexOrThrow("address")
+                val countIdx = cursor.getColumnIndexOrThrow("new_count")
+                while (cursor.moveToNext()) {
+                    val address = cursor.getString(addressIdx) ?: continue
+                    val key = PhoneNumberKeys.canonical(address)
+                    counts[key] = (counts[key] ?: 0) + cursor.getInt(countIdx)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not count new spam", e)
+        }
+        counts
+    }
+
+    /** Marks every spam message from [address] as seen, so the badges stop counting it. */
+    suspend fun markNewSpamSeen(address: String) = withContext(Dispatchers.IO) {
+        if (address.isBlank()) return@withContext
+        val variants = addressLookupKeys(address)
+        if (variants.isEmpty()) return@withContext
+        val placeholders = variants.joinToString(",") { "?" }
+        val values = ContentValues().apply { put("is_new", 0) }
+        val updated = try {
+            writableDatabase.update(
+                "spam_message_meta",
+                values,
+                "is_new = 1 AND address IN ($placeholders)",
+                variants
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not clear the new-spam flag", e)
+            0
+        }
+        if (updated > 0) _spamMetaChanged.value = System.currentTimeMillis()
+    }
+
     suspend fun getCachedThreadAddresses(threadIds: Collection<Long>): Map<Long, String> =
         withContext(Dispatchers.IO) {
             if (threadIds.isEmpty()) return@withContext emptyMap()
@@ -753,6 +828,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
             val hasSpamIdx = it.getColumnIndexOrThrow("has_spam")
             val actionIdx = it.getColumnIndex("last_message_action")
             val subIdIdx = it.getColumnIndex("sub_id")
+            val newSpamIdx = it.getColumnIndex("new_spam_count")
             while (it.moveToNext()) {
                 val contactName = if (it.isNull(nameIdx)) null else it.getString(nameIdx)
                 val lastMessageAction = if (actionIdx >= 0 && !it.isNull(actionIdx)) {
@@ -781,7 +857,8 @@ class RameshDatabaseHelper private constructor(context: Context) :
                         hasSpam = it.getInt(hasSpamIdx) == 1,
                         isUnreadSpam = it.getInt(spamIdx) == 1,
                         lastMessageAction = lastMessageAction,
-                        subId = subId
+                        subId = subId,
+                        newSpamCount = if (newSpamIdx >= 0) it.getInt(newSpamIdx) else 0
                     )
                 )
             }
@@ -834,6 +911,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
                         put("has_spam", if (thread.hasSpam) 1 else 0)
                         put("last_message_action", thread.lastMessageAction.name)
                         put("sub_id", thread.subId)
+                        put("new_spam_count", thread.newSpamCount)
                     }
                     db.insertWithOnConflict(
                         "cached_threads",
@@ -1186,7 +1264,8 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 is_unread_spam INTEGER NOT NULL DEFAULT 0,
                 has_spam INTEGER NOT NULL DEFAULT 0,
                 last_message_action TEXT NOT NULL DEFAULT 'NORMAL',
-                sub_id INTEGER NOT NULL DEFAULT -1
+                sub_id INTEGER NOT NULL DEFAULT -1,
+                new_spam_count INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -1371,7 +1450,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
     companion object {
         private const val TAG = "RameshDatabaseHelper"
         private const val DATABASE_NAME = "ramesh_filters.db"
-        private const val DATABASE_VERSION = 6
+        private const val DATABASE_VERSION = 7
         private const val SQLITE_IN_CHUNK_SIZE = 500
 
         @Volatile

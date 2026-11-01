@@ -100,6 +100,12 @@
     <string name="settings_messages_count">%1$s messages</string>
     <string name="settings_message_animation">Message animation</string>
     <string name="settings_message_animation_sub">How a new message appears in the chat</string>
+    <string name="settings_animation_fade">Fade</string>
+    <string name="settings_animation_slide">Slide</string>
+    <string name="settings_animation_pop">Pop</string>
+    <string name="settings_animation_none">None</string>
+    <string name="settings_wallpaper_needs_pick">Background photo needs to be picked again</string>
+    <string name="settings_wallpaper_needs_pick_sub">Android clears access to the photo after the app is reinstalled or moved. Pick it again to keep the background.</string>
     <string name="settings_test_notification">Send a test notification</string>
     <string name="settings_test_notification_sub">Check that notifications, sound and lock-screen privacy work</string>
     <string name="settings_test_notification_sent">Test notification sent</string>

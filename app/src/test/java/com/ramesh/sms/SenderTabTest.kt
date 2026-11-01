@@ -4,6 +4,9 @@ import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.model.FilterAction
 import com.ramesh.sms.data.model.SenderTab
 import com.ramesh.sms.data.util.PhoneNumberKeys
+import com.ramesh.sms.data.util.badgeCountForTab
+import com.ramesh.sms.data.util.countableThreadsForTab
+import com.ramesh.sms.data.util.visibleThreadsForTab
 import com.ramesh.sms.ui.components.isThreadInTab
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -128,5 +131,60 @@ class SenderTabTest {
         assertEquals("A", updatedWithOrder[1].name)
         assertEquals(2, updatedWithOrder[2].sortOrder)
         assertEquals("B", updatedWithOrder[2].name)
+    }
+
+    // --- Silent spam badge counting -------------------------------------------------------------
+    // Spam is stored read and never notifies, so `unreadCount` alone would leave the tab badge at
+    // zero. These tests pin the rule that the badge = unread + new spam, including spam-only
+    // conversations that the inbox itself hides.
+
+    private fun unreadThread(
+        threadId: Long,
+        address: String,
+        unreadCount: Int = 0,
+        newSpamCount: Int = 0,
+        spamOnly: Boolean = false
+    ) = dummyThread(threadId, address).copy(
+        unreadCount = unreadCount,
+        newSpamCount = newSpamCount,
+        spamOnly = spamOnly,
+        hasSpam = spamOnly || newSpamCount > 0
+    )
+
+    @Test
+    fun badgeAddsUnreadMessagesAndUnseenSpam() {
+        val threads = listOf(
+            unreadThread(1L, "09121234567", unreadCount = 3),
+            unreadThread(2L, "09127654321", newSpamCount = 2)
+        )
+
+        assertEquals(5, badgeCountForTab(threads, null))
+    }
+
+    @Test
+    fun badgeCountsASpamOnlyConversationTheInboxHides() {
+        val spamOnly = unreadThread(1L, "09120000000", newSpamCount = 1, spamOnly = true)
+
+        // The inbox hides spam-only threads, but the arrival still has to be visible somewhere.
+        assertTrue(visibleThreadsForTab(listOf(spamOnly), null).isEmpty())
+        assertEquals(1, badgeCountForTab(listOf(spamOnly), null))
+        assertEquals(listOf(spamOnly), countableThreadsForTab(listOf(spamOnly), null))
+    }
+
+    @Test
+    fun badgeIgnoresEmptyThreadsAndOtherTabs() {
+        val tab = SenderTab(
+            id = 1L,
+            name = "Work",
+            senderAddresses = setOf(PhoneNumberKeys.canonical("09121112222"))
+        )
+        val inTab = unreadThread(1L, "09121112222", unreadCount = 1)
+        val otherTab = unreadThread(2L, "09129998888", newSpamCount = 4)
+        val empty = unreadThread(3L, "09121112222").copy(messageCount = 0)
+
+        val threads = listOf(inTab, otherTab, empty)
+
+        assertEquals(1, badgeCountForTab(threads, tab))
+        assertEquals(5, badgeCountForTab(threads, null))
     }
 }

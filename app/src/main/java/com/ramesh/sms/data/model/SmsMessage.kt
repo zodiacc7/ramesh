@@ -38,6 +38,11 @@ data class ConversationThread(
     val date: Long,
     val messageCount: Int,
     val unreadCount: Int,
+    /**
+     * Spam messages from this sender the user has not opened yet. Spam arrives silently and is
+     * stored read, so it never shows up in [unreadCount]; the tab badges add the two together.
+     */
+    val newSpamCount: Int = 0,
     val hasSpam: Boolean = false,
     val isUnreadSpam: Boolean = false,
     val lastMessageAction: FilterAction = FilterAction.NORMAL,

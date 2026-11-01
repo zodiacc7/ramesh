@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -111,6 +112,7 @@ import androidx.compose.ui.draw.clip
 import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.R
 import com.ramesh.sms.theme.AppearanceStore
+import com.ramesh.sms.theme.MessageAnimation
 import com.ramesh.sms.theme.InputBarShape
 import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.SquircleCardShape
@@ -569,7 +571,7 @@ fun ChatScreen(
                             onValueChange = { inputText = it },
                             placeholder = {
                                 Text(
-                                    "Text message (SMS)...",
+                                    stringResource(R.string.chat_composer_hint),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -992,6 +994,12 @@ fun ChatScreen(
     }
 }
 
+/**
+ * Only bubbles younger than this animate in. Anything older is history (opening the thread, paging
+ * back, switching tabs) and must appear instantly instead of performing a slideshow.
+ */
+private const val FRESH_BUBBLE_WINDOW_MS = 15_000L
+
 @Composable
 private fun ChatMessageList(
     messages: List<SmsMessage>,
@@ -1025,30 +1033,36 @@ private fun ChatMessageList(
     val hasMultipleSims = availableSims.size > 1
     val onDateTapAction: (() -> Unit)? = if (enableDateTapShamsiToggle) onToggleDateFormat else null
 
+    // Newest first, because the list is reversed. A real reversed view instead of index arithmetic
+    // keeps the item keys stable while the message list grows under the scroll position (the old
+    // `messages[lastIndex - index]` lookup crashed with IndexOutOfBounds when it did).
+    val reversedMessages = remember(messages) { messages.asReversed() }
+    // Remembers which bubbles already played their entrance. Hoisted out of the item scope because
+    // LazyColumn may dispose and re-create a row at any time, and that must not replay the animation.
+    val alreadyAnimated = remember { mutableSetOf<Long>() }
+
     LazyColumn(
         state = listState,
         reverseLayout = true,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 12.dp)
     ) {
-        items(
-            count = messages.size,
-            key = { index -> messages[messages.lastIndex - index].id },
-            contentType = { index ->
-                val message = messages[messages.lastIndex - index]
+        itemsIndexed(
+            items = reversedMessages,
+            key = { _, message -> message.id },
+            contentType = { _, message ->
                 when {
                     message.isSpam -> "spam"
                     message.isSent -> "sent"
                     else -> "inbox"
                 }
             }
-        ) { index ->
-            val message = messages[messages.lastIndex - index]
+        ) { index, message ->
             val isHighlighted = message.id == highlightedMessageId
             val simSlotNumber = if (hasMultipleSims) simSlotMap[message.subId] else null
-            val olderMessage = messages.getOrNull(messages.lastIndex - index - 1)
+            val olderMessage = reversedMessages.getOrNull(index + 1)
             // Like Telegram/Textra: one avatar per run of incoming messages.
-            val newerMessage = messages.getOrNull(messages.lastIndex - index + 1)
+            val newerMessage = reversedMessages.getOrNull(index - 1)
             val showAvatarForMessage = look.showChatAvatars &&
                 !message.isSent &&
                 (newerMessage == null || newerMessage.isSent)
@@ -1060,12 +1074,16 @@ private fun ChatMessageList(
             } else {
                 null
             }
-            // Each fresh bubble animates in with the style picked in Settings. Older messages
-            // (history, scroll-backs) start fully visible so the list never performs a slideshow.
+            // Each fresh bubble animates in once, using the style picked in Settings. History and
+            // rows that are re-bound after a scroll start fully visible, so the list never turns
+            // into a slideshow - and a recycled row can never come back stuck at alpha 0.
+            val animateIn = look.messageAnimation != MessageAnimation.NONE &&
+                message.id !in alreadyAnimated &&
+                System.currentTimeMillis() - message.date < FRESH_BUBBLE_WINDOW_MS
             val bubbleVisible = remember(message.id) {
-                val isFresh = System.currentTimeMillis() - message.date < 15_000L
-                MutableTransitionState(!isFresh).apply { targetState = true }
+                MutableTransitionState(!animateIn).apply { targetState = true }
             }
+            LaunchedEffect(message.id) { alreadyAnimated.add(message.id) }
             AnimatedVisibility(
                 visibleState = bubbleVisible,
                 enter = messageEnterTransition(look.messageAnimation),

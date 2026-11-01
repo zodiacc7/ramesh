@@ -235,6 +235,9 @@ class SmsRepository(
             latestInboxMessage.values.forEach { metaIds.add(it.first) }
             latestUnreadMessage.values.forEach { metaIds.add(it.first) }
             val spamMetaMap = dbHelper.getSpamMetaMapForIds(metaIds)
+            // Spam is silent and stored read, so it never shows in a thread's unread count. The
+            // badges read this map to prove that a spam message arrived without a notification.
+            val newSpamByAddress = dbHelper.getNewSpamCounts()
             val pendingSpamMarks = mutableListOf<SpamMetaWrite>()
             val evaluatedActions = mutableMapOf<Long, FilterAction>()
 
@@ -383,6 +386,7 @@ class SmsRepository(
                         date = row.date,
                         messageCount = row.messageCount,
                         unreadCount = unreadCount,
+                        newSpamCount = newSpamByAddress[PhoneNumberKeys.canonical(address)] ?: 0,
                         hasSpam = lastMessageAction == FilterAction.SPAM || isUnreadSpam,
                         spamOnly = spamOnly,
                         isUnreadSpam = isUnreadSpam,
@@ -1516,6 +1520,9 @@ class SmsRepository(
 
     suspend fun setSenderTabs(address: String, tabIds: Collection<Long>) =
         dbHelper.setSenderTabs(address, tabIds)
+
+    /** Clears the silent-spam counter for [address] once the user has opened the conversation. */
+    suspend fun markNewSpamSeen(address: String) = dbHelper.markNewSpamSeen(address)
 
     suspend fun getSenderPreference(address: String): SenderPreference? =
         dbHelper.getSenderPreference(address)
