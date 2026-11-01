@@ -62,36 +62,30 @@ object SmsReactionParser {
         if (!hasReactionWord) return null
 
         val quote = QUOTED.find(cleaned)
-        // The emoji is the first token that really contains an emoji code point. Scanning the whole
-        // message (and not only the text around the quote) tolerates word order differences between
-        // clients, while insisting on an emoji keeps a sentence such as
-        // "I reacted - sorry" from being swallowed as a reaction.
+        // The emoji is the first run of emoji code points in the message. Scanning the whole message
+        // (and not only the text around the quote) tolerates word order differences between clients,
+        // while insisting on a real emoji keeps a sentence such as "I reacted - sorry" from being
+        // swallowed as a reaction.
         val emoji = cleaned
             .split(Regex("\\s+"))
-            .firstOrNull { token -> token.any { isEmoji(it) } }
+            .firstNotNullOfOrNull { token -> EMOJI_RUN.find(token)?.value }
             ?: return null
 
         val quoted = quote?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
-        // Drop variation selectors (U+FE0E/U+FE0F): they change the glyph, not the reaction, and
-        // would make the same emoji compare unequal.
-        val cleanedEmoji = emoji.trim { !isEmoji(it) }.filter { it.code != 0xFE0E && it.code != 0xFE0F }
-        return SmsReaction(emoji = cleanedEmoji, quoted = quoted)
+        return SmsReaction(emoji = emoji, quoted = quoted)
     }
 
-    /** True for the code points that make up an emoji, including the components (ZWJ, VS16, skin tone). */
-    private fun isEmoji(ch: Char): Boolean {
-        val code = ch.code
-        return code in 0x1F000..0x1FAFF ||
-            code in 0x2600..0x27BF ||
-            code in 0x2B00..0x2BFF ||
-            code in 0x2190..0x21FF ||
-            code in 0x2900..0x297F ||
-            code == 0x2764 ||
-            code in 0xFE0F..0xFE0F ||
-            code in 0x1F3FB..0x1F3FF ||
-            code == 0x200D ||
-            Character.getType(ch) == Character.OTHER_SYMBOL.toInt()
-    }
+    /**
+     * One emoji "atom": an astral code point (a surrogate pair, which is how 👍 is stored in UTF-16)
+     * or one of the BMP symbols used for emoji. Written as UTF-16 ranges on purpose - a plain
+     * `ch.code in 0x1F000..0x1FAFF` check never matches, because such an emoji is two chars.
+     */
+    private const val ATOM =
+        "(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF\u2B00-\u2BFF" +
+            "\u2190-\u21FF\u2900-\u297F\u2764\uFE30-\uFE4F])"
+
+    /** A run of emoji atoms plus the joiners, variation selectors and skin tones between them. */
+    private val EMOJI_RUN = Regex("$ATOM(?:[\uFE0E\uFE0F\u200D]|$ATOM)*")
 }
 
 /**
