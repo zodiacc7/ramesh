@@ -15,6 +15,15 @@ The key is **not** in this repository. It lives in GitHub Actions secrets, and
 | `SIGNING_KEY_ALIAS` | `ramesh` |
 | `SIGNING_KEY_PASSWORD` | key password |
 
+**The key was rotated on 2026-11-01.** The current certificate SHA-256 is:
+
+```
+C1:7B:EA:F6:B5:FC:6A:DA:59:9E:85:5D:6D:A8:00:B0:D9:C6:D0:75:CB:5F:71:C7:5A:88:3D:45:97:D2:A1:AC
+```
+
+The previous key had been public in this repository since `35d9657`, so it is **burned**: it stays in
+the git history and must never sign another release. Keep it only as an archive copy.
+
 `app/build.gradle.kts` reads those as environment variables (`SIGNING_STORE_FILE`,
 `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`, `SIGNING_STORE_TYPE`).
 The workflow writes `SIGNING_STORE_FILE` and `SIGNING_STORE_TYPE` after decoding the secret; the
@@ -48,10 +57,25 @@ updated again — every user would have to uninstall and reinstall.
 ## Key fingerprint
 
 The APK signing certificate SHA-256 is recorded in `metadata/com.ramesh.sms.yml`
-(`AllowedAPKSigningKeys`) for F-Droid. If the key is ever rotated, update that value in the same
-commit.
+(`AllowedAPKSigningKeys`) for F-Droid, and it is updated in the same commit as any rotation. Check a
+downloaded APK against it with:
+
+```bash
+apksigner verify --print-certs ramesh-<version>-universal.apk
+```
 
 ## Rotating the key
+
+### Rotation log
+
+| Date | Release | Reason |
+| --- | --- | --- |
+| 2026-11-01 | 1.1.0-beta.18 | The original key had been committed to this public repository. Wallet-app scans flagged builds signed with it, and anyone could sign an APK Android accepts as an update of Ramesh. |
+
+That rotation was a clean break (no lineage file): every installation older than beta.18 has to be
+uninstalled once, because Android refuses an update signed with a different key. Use
+`apksigner rotate --lineage` next time if existing installs must be preserved — AGP has no lineage
+support, so the APK has to be re-signed after Gradle.
 
 Rotation changes the app's identity:
 

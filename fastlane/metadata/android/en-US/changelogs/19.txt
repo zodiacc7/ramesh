@@ -1,0 +1,3 @@
+- Security: releases are now signed with a freshly generated key. Builds up to beta.17 used a key that had been published in this repository by mistake, which is why Play Protect flagged them; that key is retired.
+- Upgrading from beta.17 or older needs a one-time uninstall: Android cannot update an app whose signing key changed. Ramesh's settings are normally restored by the system backup.
+- Docs: how to verify a download (SHA256SUMS + apksigner) and what to do when Play Protect shows "unknown developer" or "harmful app blocked".

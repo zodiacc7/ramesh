@@ -115,8 +115,31 @@ Then add the pattern in Filter Studio as a blocklist rule.
 3. Grant SMS, contacts and notification permissions.
 4. Accept the prompt to become the default SMS app.
 
-Android 8.0 (API 26) or newer is required. MMS is not supported. The current release is
-**1.0.0**.
+Android 8.0 (API 26) or newer is required. MMS is not supported.
+
+**Play Protect may warn or block the install.** Ramesh is distributed outside Google Play, requests
+sensitive permissions (SMS, contacts) and every release is signed with a key Play Protect has no
+history for, so Android shows *"unknown developer"*, *"app scan recommended"* or even *"harmful app
+blocked"*. These are reputation verdicts, not a statement about the code. What to do:
+
+* **Before installing, verify the download.** Compare the file hash with `SHA256SUMS` on the same
+  release page, then check the signer:
+  ```bash
+  sha256sum ramesh-<version>-universal.apk
+  apksigner verify --print-certs ramesh-<version>-universal.apk
+  ```
+  The certificate SHA-256 must be
+  `C1:7B:EA:F6:B5:FC:6A:DA:59:9E:85:5D:6D:A8:00:B0:D9:C6:D0:75:CB:5F:71:C7:5A:88:3D:45:97:D2:A1:AC`
+  (also recorded in [keystore/README.md](keystore/README.md)).
+* **"Unknown developer" / "scan recommended"**: tap *More details → Install anyway*. This is normal
+  for any app outside Play and fades as an app accumulates installs.
+* **"Harmful app blocked"**: install over ADB (`adb install -r ramesh-<version>-universal.apk`),
+  which bypasses the Play Protect dialog, and report the false positive from the Play Store
+  (profile → Play Protect → help) with the hash and signer above. Builds up to `1.1.0-beta.17` were
+  signed with a key that had been published in this repository by mistake and are flagged for that
+  reason; from **`1.1.0-beta.18`** every release uses a freshly generated key.
+* **Upgrading from beta.17 or older**: the key changed, so Android cannot update in place — uninstall
+  once, then install the new build. `allowBackup="true"` normally restores Ramesh's settings.
 
 **Development builds.** Every push to `main` publishes an unsigned debug APK as the
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) pre-release. It uses
@@ -288,7 +311,30 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 ۴. درخواست «برنامهٔ پیامک پیش‌فرض» را بپذیرید.
 
 اندروید ۸٫۰ (API ۲۶) یا جدیدتر لازم است. پیام‌های چندرسانه‌ای (MMS) پشتیبانی نمی‌شوند.
-نسخهٔ فعلی **۱٫۰٫۰** است.
+
+**Play Protect ممکن است هشدار بدهد یا نصب را بلاک کند.** رامش بیرون از Google Play توزیع می‌شود،
+مجوزهای حساس (پیامک، مخاطبین) می‌خواهد و هر نسخه‌اش با کلیدی امضا می‌شود که Play Protect سابقه‌ای
+از آن ندارد؛ بنابراین اندروید پیام «توسعه‌دهندهٔ ناشناس»، «اسکن برنامه توصیه می‌شود» یا حتی
+«برنامهٔ مضر بلاک شد» نشان می‌دهد. این‌ها حکم شهرت‌اند، نه داوری دربارهٔ کد. کار درست:
+
+* **قبل از نصب، دانلود را تأیید کنید.** هش فایل را با `SHA256SUMS` همان صفحهٔ ریلیز مقایسه کنید و
+  امضاکننده را ببینید:
+  ```bash
+  sha256sum ramesh-<version>-universal.apk
+  apksigner verify --print-certs ramesh-<version>-universal.apk
+  ```
+  اثر انگشت گواهی باید
+  `C1:7B:EA:F6:B5:FC:6A:DA:59:9E:85:5D:6D:A8:00:B0:D9:C6:D0:75:CB:5F:71:C7:5A:88:3D:45:97:D2:A1:AC`
+  باشد (در [keystore/README.md](keystore/README.md) هم ثبت شده است).
+* **«توسعه‌دهندهٔ ناشناس» / «اسکن توصیه می‌شود»**: *More details → Install anyway*. برای هر اپ
+  بیرون از Play طبیعی است و با زیادشدن نصب‌ها کم‌رنگ می‌شود.
+* **«برنامهٔ مضر بلاک شد»**: با ADB نصب کنید (`adb install -r ramesh-<version>-universal.apk`) که
+  دیالوگ Play Protect را دور می‌زند، و مثبت‌کاذب را از Play Store (پروفایل → Play Protect → help)
+  همراه هش و اثر انگشت بالا گزارش کنید. نسخه‌های تا `1.1.0-beta.17` با کلیدی امضا شده‌اند که
+  اشتباهاً در مخزن عمومی منتشر شده بود و به همین دلیل پرچم می‌خورند؛ از **`1.1.0-beta.18`** هر نسخه
+  با کلید تازه‌ساخته امضا می‌شود.
+* **ارتقا از beta.17 یا قدیم‌تر**: کلید عوض شده، پس اندروید نمی‌تواند درجا آپدیت کند — یک‌بار
+  برنامه را حذف و نسخهٔ تازه را نصب کنید. `allowBackup="true"` معمولاً تنظیمات رامش را برمی‌گرداند.
 
 **نسخه‌های آزمایشی.** با هر push روی `main` یک APK دیباگِ امضانشده در پیش‌انتشار
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) منتشر می‌شود. شناسهٔ

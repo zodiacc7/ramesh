@@ -13,7 +13,7 @@ RepoType: git
 Repo: https://github.com/zodiacc7/ramesh.git
 Binaries: https://github.com/zodiacc7/ramesh/releases/download/%v/ramesh-%v-universal.apk
 
-AllowedAPKSigningKeys: f3c773e0a12e662c9ba90f7010500dec470dfd0d3b4db23ed19965c7d6de1f89
+AllowedAPKSigningKeys: c17beaf6b5fc6ada599e855d6da800b0d9c6d075cb5f71c75a883d4597d2a1ac
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^[0-9]+\.[0-9]+\.[0-9]+$
