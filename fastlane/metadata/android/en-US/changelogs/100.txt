@@ -10,4 +10,4 @@ Highlights since the first public build:
 - Persian and English interfaces, Shamsi/Gregorian dates, dual-SIM badges, send delay, auto-delete and lock-screen privacy.
 - No ads, no trackers, no analytics. The signing key is not in the repository; every release is built and signed by CI.
 
-Upgrading from a beta: uninstall once, then install this build. Betas were signed with a different key after the rotation on 2026-11-01, so Android cannot update in place.
+Upgrading: this build installs over the 1.1.0-beta.18 … beta.21 previews without any special step - same key, higher versionCode. Previews older than beta.18 were signed with a key that had been published by mistake, so those need one uninstall and reinstall (the system backup normally restores Ramesh's settings).
