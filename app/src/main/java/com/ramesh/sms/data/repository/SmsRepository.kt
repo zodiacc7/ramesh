@@ -25,6 +25,8 @@ import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.data.telephony.SimRepository
 import com.ramesh.sms.data.util.AppPreferences
 import com.ramesh.sms.data.util.PhoneNumberKeys
+import com.ramesh.sms.data.util.SmsReactionParser
+import com.ramesh.sms.data.util.foldSmsReactions
 import com.ramesh.sms.data.util.resolveInboxAction
 import com.ramesh.sms.data.util.UserPreferences
 import com.ramesh.sms.engine.FilterRulesCache
@@ -191,7 +193,12 @@ class SmsRepository(
                         val tId = uCursor.getLong(tIdIdx)
                         val msgId = uCursor.getLong(idIdx)
                         val body = uCursor.getString(bodyIdx) ?: ""
-                        unreadCounts[tId] = (unreadCounts[tId] ?: 0) + 1
+                        // A reaction SMS is folded onto the message it quotes, so it never
+                        // produces a bubble of its own; counting it as unread would leave the
+                        // badge pointing at a message the user cannot see.
+                        if (SmsReactionParser.parse(body) == null) {
+                            unreadCounts[tId] = (unreadCounts[tId] ?: 0) + 1
+                        }
                         if (!latestUnreadMessage.containsKey(tId)) {
                             latestUnreadMessage[tId] = Pair(msgId, body)
                         }
@@ -382,7 +389,7 @@ class SmsRepository(
                         threadId = threadId,
                         address = address,
                         contactName = contactName,
-                        snippet = row.snippet,
+                        snippet = inboxSnippet(row.snippet, lastInbox?.second),
                         date = row.date,
                         messageCount = row.messageCount,
                         unreadCount = unreadCount,
@@ -582,7 +589,23 @@ class SmsRepository(
         }
 
         messages.reverse()
-        messages
+        // Reactions arrive as plain SMS from clients with no reaction protocol, for example
+        // Reacted 👍 to "see you at 8". Fold them onto the message they quote instead of showing
+        // a second bubble that reads like the contact answered with a sentence about reacting.
+        foldSmsReactions(messages)
+    }
+
+    /**
+     * Inbox preview for a thread whose newest message may be a reaction SMS.
+     *
+     * A provider snippet such as Reacted 👍 to "see you at 8" reads as a sentence in the list,
+     * while what the user wants is the reaction and the text it answers, so the preview becomes
+     * `👍 see you at 8`.
+     */
+    private fun inboxSnippet(providerSnippet: String, latestInboxBody: String?): String {
+        val body = latestInboxBody?.takeIf { it.isNotBlank() } ?: return providerSnippet
+        val reaction = SmsReactionParser.parse(body) ?: return providerSnippet
+        return "\u200e${reaction.emoji} ${reaction.quoted}"
     }
 
     private fun getLatestMessageSubId(address: String): Int? {

@@ -1033,13 +1033,17 @@ private fun ChatMessageList(
     val hasMultipleSims = availableSims.size > 1
     val onDateTapAction: (() -> Unit)? = if (enableDateTapShamsiToggle) onToggleDateFormat else null
 
-    // Newest first, because the list is reversed. A real reversed view instead of index arithmetic
-    // keeps the item keys stable while the message list grows under the scroll position (the old
-    // `messages[lastIndex - index]` lookup crashed with IndexOutOfBounds when it did).
-    val reversedMessages = remember(messages) { messages.asReversed() }
-    // Remembers which bubbles already played their entrance. Hoisted out of the item scope because
-    // LazyColumn may dispose and re-create a row at any time, and that must not replay the animation.
-    val alreadyAnimated = remember { mutableSetOf<Long>() }
+    // Newest first, because the list is reversed. This is a real copy, not a view: LazyColumn
+    // measures and re-measures while the provider list is being replaced underneath, and a reversed
+    // view over a mutating list is what threw IndexOutOfBoundsException / ConcurrentModification.
+    val reversedMessages = messages.reversed()
+    val animationStyle = look.messageAnimation
+    // The bubble that is allowed to play the entrance animation: the newest one. Remembering the
+    // ids that already played it (and resetting that memory whenever the style changes) means the
+    // chat replays the newest bubble after a style change instead of looking like the setting is
+    // dead, while scrolling still never turns the history into a slideshow.
+    val newestId = reversedMessages.firstOrNull()?.id
+    val alreadyAnimated = remember(animationStyle) { mutableSetOf<Long>() }
 
     LazyColumn(
         state = listState,
@@ -1074,20 +1078,21 @@ private fun ChatMessageList(
             } else {
                 null
             }
-            // Each fresh bubble animates in once, using the style picked in Settings. History and
-            // rows that are re-bound after a scroll start fully visible, so the list never turns
-            // into a slideshow - and a recycled row can never come back stuck at alpha 0.
-            val animateIn = look.messageAnimation != MessageAnimation.NONE &&
+            // Only the newest bubble animates, and only the first time it is shown for the current
+            // style. Everything else (history, rows re-bound after a scroll) starts fully visible,
+            // so the list can never come back stuck at alpha 0 or perform a slideshow.
+            val animateIn = animationStyle != MessageAnimation.NONE &&
                 message.id !in alreadyAnimated &&
-                System.currentTimeMillis() - message.date < FRESH_BUBBLE_WINDOW_MS
-            val bubbleVisible = remember(message.id) {
+                (message.id == newestId ||
+                    System.currentTimeMillis() - message.date < FRESH_BUBBLE_WINDOW_MS)
+            val bubbleVisible = remember(message.id, animationStyle) {
                 MutableTransitionState(!animateIn).apply { targetState = true }
             }
-            LaunchedEffect(message.id) { alreadyAnimated.add(message.id) }
+            LaunchedEffect(message.id, animationStyle) { alreadyAnimated.add(message.id) }
             AnimatedVisibility(
                 visibleState = bubbleVisible,
-                enter = messageEnterTransition(look.messageAnimation),
-                exit = messageExitTransition(look.messageAnimation)
+                enter = messageEnterTransition(animationStyle),
+                exit = messageExitTransition(animationStyle)
             ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (headerText != null) {

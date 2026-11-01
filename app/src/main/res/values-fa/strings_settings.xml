@@ -104,6 +104,8 @@
     <string name="settings_animation_slide">کشویی</string>
     <string name="settings_animation_pop">جهشی</string>
     <string name="settings_animation_none">بدون انیمیشن</string>
+    <string name="settings_animation_preview_bubble">پیام تازه</string>
+    <string name="settings_animation_replay">برای تکرار بزنید</string>
     <string name="settings_wallpaper_needs_pick">عکس پس‌زمینه باید دوباره انتخاب شود</string>
     <string name="settings_wallpaper_needs_pick_sub">اندروید پس از نصب دوباره یا جابه‌جایی برنامه، دسترسی به عکس را پاک می‌کند. برای حفظ پس‌زمینه آن را دوباره انتخاب کنید.</string>
     <string name="settings_test_notification">ارسال نوتیفیکیشن آزمایشی</string>
