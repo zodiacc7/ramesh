@@ -835,9 +835,6 @@ private fun AnimationPreviewRow(look: Appearance) {
     // Replay on every change, including the very first composition, so the row always demonstrates
     // the current style instead of showing a static bubble.
     LaunchedEffect(look.messageAnimation) { replay++ }
-    val state = remember(replay, look.messageAnimation) {
-        MutableTransitionState(false).apply { targetState = true }
-    }
 
     Row(
         modifier = Modifier
@@ -847,11 +844,9 @@ private fun AnimationPreviewRow(look: Appearance) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.weight(1f)) {
-            AnimatedVisibility(
-                visibleState = state,
-                enter = messageEnterTransition(look.messageAnimation),
-                exit = messageExitTransition(look.messageAnimation)
-            ) {
+            // PreviewAnimatedSlot owns the AnimatedVisibility call: the RowScope overload of
+            // AnimatedVisibility would otherwise shadow the plain one inside this Box.
+            PreviewAnimatedSlot(replay, look) {
                 Surface(
                     shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
                     color = look.receivedTone.bubbleBackground(false)
