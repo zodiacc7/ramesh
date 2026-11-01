@@ -12,7 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -64,6 +66,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -513,7 +516,11 @@ fun SettingsScreen(
                         selectedIndex = look.messageAnimation.ordinal,
                         onSelect = { index ->
                             update { it.copy(messageAnimation = MessageAnimation.entries[index]) }
-                        }
+                        },
+                        // The full chat preview lives at the top of a long scrolling screen, so it
+                        // is not even composed when the user taps this row. A preview right here is
+                        // the only way the choice visibly does something.
+                        footer = { AnimationPreviewRow(look) }
                     )
                 }
             }
@@ -816,6 +823,51 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Plays the chosen message animation next to the picker itself.
+ *
+ * Changing the setting used to do nothing visible: the conversation preview sits at the top of the
+ * settings list and is recycled while the user is scrolled down to this row. Tap the row to replay.
+ */
+@Composable
+private fun AnimationPreviewRow(look: Appearance) {
+    var replay by remember { mutableIntStateOf(0) }
+    // Replay on every change, including the very first composition, so the row always demonstrates
+    // the current style instead of showing a static bubble.
+    LaunchedEffect(look.messageAnimation) { replay++ }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clickable { replay++ },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            // PreviewAnimatedSlot owns the AnimatedVisibility call: the RowScope overload of
+            // AnimatedVisibility would otherwise shadow the plain one inside this Box.
+            PreviewAnimatedSlot(replay, look) {
+                Surface(
+                    shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
+                    color = look.receivedTone.bubbleBackground(false)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_animation_preview_bubble),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = look.receivedTone.bubbleContent(false),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
+        Text(
+            text = stringResource(R.string.settings_animation_replay),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
 @Composable
 private fun BubblePreviewCard(look: Appearance) {
     // Replay the chosen animation whenever the style or the backdrop changes, so the picker shows a
@@ -828,7 +880,9 @@ private fun BubblePreviewCard(look: Appearance) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            // Tapping the card replays the animation, so the style can be checked on demand.
+            .clickable { replay++ },
         shape = SquircleCardShape,
         colors = CardDefaults.cardColors(containerColor = previewBackground),
         border = BorderStroke(

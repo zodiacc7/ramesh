@@ -11,15 +11,19 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 
 /**
- * Enter animation for a message bubble. Every style stays short (under 200 ms) so a burst of
- * incoming messages never turns into a slideshow.
+ * Enter animation for a message bubble.
+ *
+ * The three styles have to be told apart at a glance - an earlier version moved the bubble by a
+ * third of its height in 200 ms, which is indistinguishable from a fade on a phone, so the setting
+ * looked broken. Each style now has a clearly different shape and duration, and still stays short
+ * enough that a burst of incoming messages never turns into a slideshow.
  */
 fun messageEnterTransition(style: MessageAnimation): EnterTransition = when (style) {
-    MessageAnimation.FADE -> fadeIn(tween(170))
+    MessageAnimation.FADE -> fadeIn(tween(220))
     MessageAnimation.SLIDE ->
-        slideInVertically(animationSpec = tween(210)) { height -> height / 3 } + fadeIn(tween(150))
+        slideInVertically(animationSpec = tween(300)) { height -> height } + fadeIn(tween(180))
     MessageAnimation.POP ->
-        scaleIn(animationSpec = tween(190), initialScale = 0.86f) + fadeIn(tween(140))
+        scaleIn(animationSpec = tween(280), initialScale = 0.55f) + fadeIn(tween(160))
     MessageAnimation.NONE -> EnterTransition.None
 }
 
@@ -27,8 +31,8 @@ fun messageEnterTransition(style: MessageAnimation): EnterTransition = when (sty
 fun messageExitTransition(style: MessageAnimation): ExitTransition = when (style) {
     MessageAnimation.FADE -> fadeOut(tween(120))
     MessageAnimation.SLIDE ->
-        slideOutVertically(animationSpec = tween(150)) { height -> height / 4 } + fadeOut(tween(110))
+        slideOutVertically(animationSpec = tween(160)) { height -> height / 3 } + fadeOut(tween(120))
     MessageAnimation.POP ->
-        scaleOut(animationSpec = tween(140), targetScale = 0.9f) + fadeOut(tween(110))
+        scaleOut(animationSpec = tween(150), targetScale = 0.85f) + fadeOut(tween(120))
     MessageAnimation.NONE -> ExitTransition.None
 }

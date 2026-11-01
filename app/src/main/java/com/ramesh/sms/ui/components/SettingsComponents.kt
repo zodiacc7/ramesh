@@ -224,7 +224,9 @@ fun SettingsChoiceRow(
     options: List<String>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
-    showDivider: Boolean = false
+    showDivider: Boolean = false,
+    /** Optional extra content under the pill strip, e.g. a live preview of the chosen value. */
+    footer: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -258,6 +260,10 @@ fun SettingsChoiceRow(
                     onClick = { onSelect(index) }
                 )
             }
+        }
+        if (footer != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            footer()
         }
     }
     if (showDivider) SettingsRowDivider()
