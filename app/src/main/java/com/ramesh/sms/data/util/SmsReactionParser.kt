@@ -1,9 +1,6 @@
 package com.ramesh.sms.data.util
 
-import android.util.Log
 import com.ramesh.sms.data.model.SmsMessage
-
-private const val TAG = "SmsReaction"
 
 /**
  * A reaction that arrived as a plain SMS.
@@ -75,7 +72,10 @@ object SmsReactionParser {
             ?: return null
 
         val quoted = quote?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
-        return SmsReaction(emoji = emoji.trim { !isEmoji(it) }, quoted = quoted)
+        // Drop variation selectors (U+FE0E/U+FE0F): they change the glyph, not the reaction, and
+        // would make the same emoji compare unequal.
+        val cleanedEmoji = emoji.trim { !isEmoji(it) }.filter { it.code != 0xFE0E && it.code != 0xFE0F }
+        return SmsReaction(emoji = cleanedEmoji, quoted = quoted)
     }
 
     /** True for the code points that make up an emoji, including the components (ZWJ, VS16, skin tone). */
@@ -109,7 +109,6 @@ object SmsReactionParser {
 fun foldSmsReactions(messages: List<SmsMessage>): List<SmsMessage> {
     if (messages.size < 2) return messages
     val result = ArrayList<SmsMessage>(messages.size)
-    var folded = 0
     for (message in messages) {
         val reaction = SmsReactionParser.parse(message.body)
         if (reaction == null) {
@@ -141,15 +140,6 @@ fun foldSmsReactions(messages: List<SmsMessage>): List<SmsMessage> {
         if (target.reaction.isNullOrBlank()) {
             result[fallbackIndex] = target.copy(reaction = reaction.emoji)
         }
-        folded++
-        Log.d(
-            TAG,
-            "Folded reaction ${reaction.emoji} onto message ${target.id} " +
-                "(quoted match: ${exactIndex >= 0})"
-        )
-    }
-    if (folded > 0) {
-        Log.d(TAG, "Folded $folded reaction message(s) out of ${messages.size}")
     }
     return result
 }

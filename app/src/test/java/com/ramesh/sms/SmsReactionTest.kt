@@ -37,7 +37,8 @@ class SmsReactionTest {
 
     @Test
     fun parsesStraightQuotesAndTheWithVariants() {
-        assertEquals("❤️", SmsReactionParser.parse("Reacted ❤️ to \"see you at 8\"")?.emoji)
+        // The parser drops U+FE0F so the same emoji always compares equal.
+        assertEquals("\u2764", SmsReactionParser.parse("Reacted ❤️ to \"see you at 8\"")?.emoji)
         assertEquals("👍", SmsReactionParser.parse("Reacted with 👍 to \"ok\"")?.emoji)
         assertEquals("😂", SmsReactionParser.parse("Reacted to \"that was funny\" with 😂")?.emoji)
         assertEquals(
@@ -123,7 +124,7 @@ class SmsReactionTest {
 
         assertEquals(2, folded.size)
         assertNull(folded[0].reaction)
-        assertEquals("❤️", folded[1].reaction)
+        assertEquals("\u2764", folded[1].reaction)
     }
 
     @Test
@@ -139,14 +140,14 @@ class SmsReactionTest {
 
     @Test
     fun anExistingLocalReactionIsNotOverwritten() {
-        val original = message(1L, "hi").copy(reaction = "❤️")
+        val original = message(1L, "hi").copy(reaction = "\u2764")
         val reaction = message(2L, "Reacted 👍 to \"hi\"")
 
         val folded = foldSmsReactions(listOf(original, reaction))
 
         // The extra bubble is gone, but the emoji the user picked stays.
         assertEquals(1, folded.size)
-        assertEquals("❤️", folded[0].reaction)
+        assertEquals("\u2764", folded[0].reaction)
     }
 
     @Test
