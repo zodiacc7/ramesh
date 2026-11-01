@@ -29,9 +29,6 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "SmsReceiver"
 
-/** Broadcast sent to the UI when a new SMS is stored, so it can reload immediately. */
-const val ACTION_NEW_SMS_RECEIVED = "com.ramesh.sms.NEW_SMS_RECEIVED"
-
 class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -356,6 +353,9 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        /** Broadcast sent to the UI when a new SMS is stored, so it can reload immediately. */
+        const val ACTION_NEW_SMS_RECEIVED = "com.ramesh.sms.NEW_SMS_RECEIVED"
+
         private const val INBOX_LOOKUP_ATTEMPTS = 4
         private const val INBOX_LOOKUP_DELAY_MS = 400L
         private const val INBOX_LOOKUP_WINDOW_MS = 15_000L

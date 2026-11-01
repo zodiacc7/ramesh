@@ -1,6 +1,7 @@
 package com.ramesh.sms.ui.screens
 
 import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
@@ -11,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.DisposableEffect
-import com.ramesh.sms.receiver.SmsReceiver
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState as animateFloat
 import androidx.compose.animation.core.spring
@@ -119,6 +119,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,6 +134,7 @@ import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.model.SearchMessageResult
 import androidx.compose.ui.semantics.Role
 import com.ramesh.sms.data.model.SenderTab
+import com.ramesh.sms.receiver.SmsReceiver
 import com.ramesh.sms.theme.AppearanceStore
 import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.SquircleCardShape
@@ -191,18 +193,20 @@ fun ConversationsScreen(
 
     // Listen for NEW_SMS_RECEIVED broadcast from SmsReceiver so the inbox reloads
     // immediately when a new SMS arrives, without requiring a ContentObserver.
-    DisposableEffect(Unit) {
+    // The broadcast never leaves the app, so it is registered as not exported.
+    val appContext = context.applicationContext
+    DisposableEffect(viewModel, appContext) {
         val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
                 if (intent?.action == SmsReceiver.ACTION_NEW_SMS_RECEIVED) {
                     viewModel.loadThreads(force = true)
                 }
             }
         }
         val filter = IntentFilter(SmsReceiver.ACTION_NEW_SMS_RECEIVED)
-        LocalContext.current.registerReceiver(receiver, filter)
+        ContextCompat.registerReceiver(appContext, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
-            LocalContext.current.unregisterReceiver(receiver)
+            appContext.unregisterReceiver(receiver)
         }
     }
 
