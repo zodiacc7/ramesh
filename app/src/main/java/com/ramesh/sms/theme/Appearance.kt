@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
 /**
- * Textra-style customisation model.
+ * Customisation model: every look-and-feel choice the user can make.
  *
  * Everything the user can tweak about the look of Ramesh lives here so it can be
  * persisted in one place and read from any composable through [AppearanceStore].
@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.luminance
 data class Appearance(
     val themeMode: ThemeMode = ThemeMode.AUTO,
     val accent: AccentColor = AccentColor.TEAL,
-    val bubbleStyle: BubbleStyle = BubbleStyle.TEXTRA,
+    val bubbleStyle: BubbleStyle = BubbleStyle.CLASSIC,
     val bubbleTail: Boolean = true,
     val sentTone: BubbleTone = BubbleTone.ACCENT,
     val receivedTone: BubbleTone = BubbleTone.SURFACE,
@@ -44,7 +44,12 @@ enum class ThemeMode(val label: String) {
 }
 
 enum class BubbleStyle(val label: String, val cornerDp: Float, val tailDp: Float) {
-    TEXTRA("Textra", 18f, 11f),
+    /**
+     * Corner radius + tail of the "classic" messenger look. It used to be named after the app it
+     * imitates; a product name does not belong in our own UI, so the label is neutral and
+     * [AppearanceStore] migrates the stored `TEXTRA` value.
+     */
+    CLASSIC("Classic", 18f, 11f),
     ROUNDED("Rounded", 20f, 0f),
     PILL("Pill", 24f, 0f),
     COMPACT("Compact", 10f, 7f)
@@ -221,7 +226,7 @@ enum class AccentColor(val label: String, val palette: AccentPalette?) {
 }
 
 /**
- * Bubble colour presets, Textra style: pick a colour for outgoing bubbles and a
+ * Bubble colour presets: pick a colour for outgoing bubbles and a
  * different one for incoming bubbles. [ACCENT] and [SURFACE] follow the theme.
  */
 enum class BubbleTone(

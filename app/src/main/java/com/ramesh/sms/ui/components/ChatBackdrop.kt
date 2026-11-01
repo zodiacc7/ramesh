@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 private const val TAG = "ChatBackdrop"
 
 /**
- * Paints the chat wallpaper: a Textra-style tone, an optional photo picked from the gallery, plus a
+ * Paints the chat wallpaper: a background tone, an optional photo picked from the gallery, plus a
  * scrim so bubbles stay readable.
  *
  * A tone is never flat - a slight vertical gradient keeps the selected colour visible even when it

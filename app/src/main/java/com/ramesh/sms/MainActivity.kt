@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Textra-style look & feel is stored separately from inbox preferences.
+        // Look & feel is stored separately from the inbox preferences.
         AppearanceStore.init(this)
         enableEdgeToEdge()
         handleIntent(intent)

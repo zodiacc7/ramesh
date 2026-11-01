@@ -87,7 +87,7 @@ private val DarkColors = darkColorScheme(
     outlineVariant = md_theme_dark_outlineVariant
 )
 
-/** Applies a Textra-style accent palette on top of Ramesh's base scheme. */
+/** Applies the chosen accent palette on top of Ramesh's base scheme. */
 private fun ColorScheme.withAccent(palette: AccentPalette, dark: Boolean): ColorScheme {
     return if (dark) {
         copy(
@@ -122,7 +122,7 @@ private fun ColorScheme.withAccent(palette: AccentPalette, dark: Boolean): Color
     }
 }
 
-/** Textra's "Black" theme: true black surfaces for AMOLED screens. */
+/** The "Black" theme: true black surfaces for AMOLED screens. */
 private fun ColorScheme.asBlack(): ColorScheme = copy(
     background = Color(0xFF000000),
     onBackground = Color(0xFFE8E8E8),

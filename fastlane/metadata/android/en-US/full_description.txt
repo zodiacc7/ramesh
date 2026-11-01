@@ -1,4 +1,4 @@
-A spam-free SMS app for Iran, with a Textra-style look you can customise completely.
+A spam-free SMS app for Iran with a look you can customise completely.
 
 Iranian SMS has turned into a flood of ads, promotions and scams, mixed with verification codes you cannot afford to miss. Ramesh filters the noise with regex rules you control, and an allowlist makes sure OTPs and banking messages always get through.
 
@@ -7,7 +7,7 @@ Iranian SMS has turned into a flood of ads, promotions and scams, mixed with ver
   <li><b>Regex filters with allowlist priority:</b> allowlist rules are evaluated first, so you never miss an OTP or a bank message.</li>
   <li><b>Built-in Iranian spam presets:</b> ships with filters for Iranian spam, ads, phishing and scams; keep, edit, disable or delete any of them.</li>
   <li><b>Filter Studio:</b> add custom regex or substring rules, test patterns against sample text, and export/import the whole rule set as JSON.</li>
-  <li><b>Textra-style appearance:</b> auto, light, dark and true-black themes, accent colors, bubble shapes with an optional tail, separate sent and received colors, message fonts and sizes, gallery wallpapers and contact photos.</li>
+  <li><b>Full appearance control:</b> auto, light, dark and true-black themes, accent colors, bubble shapes with an optional tail, separate sent and received colors, message fonts and sizes, gallery wallpapers and contact photos.</li>
   <li><b>Dual SIM:</b> choose the SIM per message, see which SIM received a message, and filter the inbox by SIM.</li>
   <li><b>Quiet notifications:</b> filtered messages arrive silently, spam produces no notification, and notifications support inline reply, mark as read and copying verification codes.</li>
   <li><b>Material 3 Expressive UI</b> with correct right-to-left text and optional Shamsi dates.</li>

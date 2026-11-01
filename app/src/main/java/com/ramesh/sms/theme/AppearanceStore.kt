@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * Single source of truth for the Textra-style look & feel settings.
+ * Single source of truth for the look & feel settings.
  *
  * The value is a Compose snapshot state, so every screen that reads
  * [AppearanceStore.current] recomposes as soon as the user changes a setting.
@@ -121,9 +121,17 @@ object AppearanceStore {
     private inline fun <reified T : Enum<T>> SharedPreferences.readEnum(key: String, fallback: T): T {
         val raw = getString(key, null) ?: return fallback
         return try {
-            enumValueOf<T>(raw)
+            enumValueOf<T>(migrateEnumName(raw, fallback))
         } catch (_: IllegalArgumentException) {
             fallback
         }
     }
+
+    /**
+     * Stored enums are written by [Enum.name], so renaming a constant silently resets the user's
+     * choice to the default. `BubbleStyle.TEXTRA` was renamed to `CLASSIC` in 1.0.0; map the old
+     * name here instead of losing the setting.
+     */
+    private fun <T : Enum<T>> migrateEnumName(raw: String, fallback: T): String =
+        if (raw == "TEXTRA" && fallback is BubbleStyle) BubbleStyle.CLASSIC.name else raw
 }

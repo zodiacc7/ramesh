@@ -14,9 +14,9 @@
     <string name="settings_accent_sub">Used for buttons, unread badges and the default bubble</string>
     <string name="settings_accent_system">Follows your wallpaper colors on Android 12+</string>
     <string name="settings_bubbles_header">Bubbles</string>
-    <string name="settings_bubbles_sub">Textra-style bubbles, colors and message text</string>
+    <string name="settings_bubbles_sub">Bubble shapes, colors and message text</string>
     <string name="settings_bubble_style">Bubble style</string>
-    <string name="settings_bubble_style_sub">Textra adds a small tail to the bottom corner</string>
+    <string name="settings_bubble_style_sub">The classic shape adds a small tail to the bottom corner</string>
     <string name="settings_bubble_tail">Bubble tail</string>
     <string name="settings_bubble_tail_sub">Pointy corner on the sender side</string>
     <string name="settings_sent_color">Sent bubble color</string>
@@ -88,7 +88,7 @@
     <string name="settings_auto_delete_sub">Per conversation. Older messages are removed from the phone once the limit is passed; off by default.</string>
     <string name="settings_reset_header">Reset</string>
     <string name="settings_restore_look">Restore default look</string>
-    <string name="settings_restore_look_sub">Turquoise theme, Textra bubbles, no wallpaper</string>
+    <string name="settings_restore_look_sub">Turquoise theme, classic bubbles, no wallpaper</string>
     <string name="settings_restore_title">Restore default look?</string>
     <string name="settings_restore_body">Theme, bubbles, fonts and the chat background return to their defaults. Your messages and filters are untouched.</string>
     <string name="settings_preview_in">Ramesh looks like this</string>
@@ -116,7 +116,7 @@
     <string name="settings_about_sub">Version and project information</string>
     <string name="settings_about_app">About Ramesh</string>
     <string name="settings_about_version">Version %1$s</string>
-    <string name="settings_about_body">Ramesh is a fast, private SMS messenger with Textra-style themes, Persian and English interfaces, sender tabs, spam filtering and no ads or trackers.</string>
+    <string name="settings_about_body">Ramesh is a fast, private SMS messenger with deep theme customisation, Persian and English interfaces, sender tabs, spam filtering and no ads or trackers.</string>
     <string name="settings_about_source">Source code: github.com/zodiacc7/ramesh</string>
     <string name="settings_about_close">Close</string>
 </resources>

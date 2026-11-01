@@ -1,0 +1,10 @@
+Ramesh 1.0.0 (build 1000) — the first stable release.
+
+What is new since the last preview:
+- The message animation setting now controls how conversations and other screens open and close (slide, fade, pop or none), with a live preview on the setting row.
+- Reactions sent as text by other clients ("Reacted 👍 to …") are folded onto the message they answer, including messages with Persian direction marks, instead of appearing as a separate bubble.
+- Spam still arrives without a notification, but it now shows in the All and Spam tab badges until you open the conversation.
+- Chat backgrounds are clearly distinct in dark mode, and Settings warns you when Android has revoked access to a wallpaper photo.
+- The bubble preset is now called "Classic"; your existing choice is kept when you update.
+
+Full feature list and install/verification instructions: github.com/zodiacc7/ramesh

@@ -4,6 +4,7 @@
 
 [English](#english) · [فارسی](#farsi)
 
+[![Version](https://img.shields.io/badge/version-1.0.0_(1000)-blue.svg)](https://github.com/zodiacc7/ramesh/releases/latest)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3ddc84.svg)](https://developer.android.com/about/versions/oreo)
 
@@ -13,8 +14,8 @@
 
 ## English
 
-Ramesh is a full-featured Android SMS app built for Iran's messaging reality, with a
-Textra-style look you can customise down to the last detail.
+Ramesh is a full-featured Android SMS app built for Iran's messaging reality, with a look you can
+customise down to the last detail.
 
 Iranian SMS is mostly noise: ads, promotions and scams, mixed with the occasional
 verification code you cannot afford to miss. Ramesh ships with ready-made regex filters
@@ -24,6 +25,12 @@ get through.
 > Ramesh is an independent app published under the `com.ramesh.sms` package id as a free
 > (GPL-3.0) open-source project.
 
+**Current release: 1.0.0 (build 1000).** Release notes live on the
+[releases page](https://github.com/zodiacc7/ramesh/releases) and in
+[`fastlane/metadata/android/en-US/changelogs/`](fastlane/metadata/android/en-US/changelogs);
+design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the open audit in
+[docs/REVIEW.md](docs/REVIEW.md).
+
 ### Highlights
 
 - **Allowlist-first filtering.** Allowlist rules run before the blocklist, so a promotional
@@ -32,20 +39,25 @@ get through.
   disable them, edit them, or delete everything and start from your own list.
 - **Filter Studio.** Add regex or plain-text rules, test a pattern against sample text, and
   export/import the whole rule set as JSON.
-- **Textra-style appearance.** Auto/Light/Dark/AMOLED-Black themes, accent colors, bubble
-  styles with a tail, separate sent/received bubble colors, message fonts and sizes, chat
-  wallpapers and contact photos.
+- **Deep appearance customisation.** Auto/Light/Dark/AMOLED-Black themes, accent colors, four
+  bubble shapes with an optional tail, separate sent/received bubble colors, message fonts and
+  sizes, six background tones or any gallery photo, and contact photos.
 - **Dual SIM done properly.** Pick the SIM per message, see which SIM received a message, and
   filter the inbox by SIM.
-- **Peaceful notifications.** Filtered messages arrive silently, spam produces no notification
-  at all, and notifications support inline reply, mark-as-read, optional delete and a one-tap
-  **Copy code** button for verification SMS.
+- **Peaceful notifications, visible counts.** Filtered messages arrive silently and spam produces
+  no notification at all, but a spam arrival still raises the badge on the **All** and **Spam**
+  tabs until you open the conversation. Notifications support inline reply, mark-as-read, optional
+  delete and a one-tap **Copy code** button for verification SMS.
 - **No network permission.** Ramesh has no `INTERNET` permission: filtering, contacts and
   media decoding all happen on-device.
 - **RTL-aware.** Persian and Arabic message bodies render with the correct direction and
   punctuation even in the English UI, and dates can be shown in the Shamsi calendar.
-- **Reactions.** Long-press any message and drop an emoji reaction on it — stored locally and
-  shown as a chip under the bubble.
+- **Reactions that stay in place.** Long-press any message and drop an emoji reaction on it —
+  stored locally and shown as a chip under the bubble. Reaction SMS that other clients send as
+  text (`Reacted 👍 to "…"`) are recognised and folded onto the message they answer instead of
+  appearing as a separate bubble.
+- **Animated navigation.** Choose how conversations and other screens open and close — slide,
+  fade, pop or no animation — and see the effect in the settings preview straight away.
 - **Delivery reports, send delay and auto-cleanup.** Confirm delivery per message, hold an
   outgoing SMS for 3/5/10 seconds with a cancel button, and optionally cap a conversation at
   500–5,000 messages so the oldest ones disappear by themselves.
@@ -64,9 +76,9 @@ inbox** sheet. Everything applies live.
 | Section | What you can change |
 | --- | --- |
 | **Theme** | Auto, Light, Dark, or Black (true black for AMOLED). Accent follows the system wallpaper color on Android 12+, or pick one of nine hand-tuned accents. |
-| **Bubbles** | Textra, Rounded, Pill or Compact shape; bubble tail on/off; independent colors for sent and received bubbles; four text sizes; Vazirmatn, Plus Jakarta or the system font. |
-| **Chat background** | Six flat tones, or any photo from your gallery (downsampled and scrimmed so bubbles stay readable). |
-| **Conversation** | Contact photos next to received messages, Today/Yesterday dividers, Enter-to-send, SMS character counter, tap a timestamp to switch Gregorian/Shamsi. |
+| **Bubbles** | Classic, Rounded, Pill or Compact shape; bubble tail on/off; independent colors for sent and received bubbles; four text sizes; Vazirmatn, Plus Jakarta or the system font. |
+| **Chat background** | Six background tones, or any photo from your gallery (downsampled and scrimmed so bubbles stay readable). Settings warns you if Android has revoked access to the photo, instead of silently showing a blank background. |
+| **Conversation** | Contact photos next to received messages, Today/Yesterday dividers, Enter-to-send, SMS character counter, tap a timestamp to switch Gregorian/Shamsi, and the message animation used when a chat opens or closes. |
 | **Inbox** | Conversation tabs, SIM filter, contact photos, contacts-only mode. |
 | **Notifications** | Delete action, the copy-code button for one-time codes, delivery reports, and what the lock screen may show. |
 | **Sending** | Send delay (off / 3 / 5 / 10 seconds) with a countdown you can cancel. |
@@ -110,7 +122,7 @@ Then add the pattern in Filter Studio as a blocklist rule.
 ### Install
 
 1. Download the signed `ramesh-<version>-universal.apk` from
-   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases).
+   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) (latest: **1.0.0**, build 1000).
 2. Install it and open Ramesh.
 3. Grant SMS, contacts and notification permissions.
 4. Accept the prompt to become the default SMS app.
@@ -135,11 +147,12 @@ blocked"*. These are reputation verdicts, not a statement about the code. What t
   for any app outside Play and fades as an app accumulates installs.
 * **"Harmful app blocked"**: install over ADB (`adb install -r ramesh-<version>-universal.apk`),
   which bypasses the Play Protect dialog, and report the false positive from the Play Store
-  (profile → Play Protect → help) with the hash and signer above. The pre-release builds that were
-  published before `1.0.0` used a key that had been published in this repository by mistake and are
+  (profile → Play Protect → help) with the hash and signer above. Builds published before
+  `1.0.0` were signed with a key that had been published in this repository by mistake and are
   flagged for that reason; **`1.0.0` and everything after it** use a freshly generated key.
-* **Upgrading from a pre-release build**: the key changed, so Android cannot update in place —
-  uninstall once, then install `1.0.0`. `allowBackup="true"` normally restores Ramesh's settings.
+* **Upgrading**: `1.0.0` installs over any build signed with the current key (`1.1.0-beta.18` and
+  later). Builds older than that used the retired key, so those need one uninstall and reinstall;
+  `allowBackup="true"` normally restores Ramesh's settings.
 
 **Development builds.** Every push to `main` publishes an unsigned debug APK as the
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) pre-release. It uses
@@ -200,9 +213,12 @@ Issues and pull requests: <https://github.com/zodiacc7/ramesh>.
 
 ### Credits & license
 
-Ramesh is based on [Misga](https://github.com/mirarr-app/Misga) by Mirarr and is inspired by
-[Textra SMS](https://textra.app). Fonts: [Vazirmatn](https://github.com/rastikerdar/vazirmatn)
-and [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) (both SIL OFL).
+Ramesh is based on [Misga](https://github.com/mirarr-app/Misga) by Mirarr. Its bubble shapes and
+theme picker were inspired by several messenger UIs, including
+[Textra SMS](https://textra.app); no code, artwork or other asset from those apps is used here, and
+Ramesh is not affiliated with, endorsed by or sponsored by any of them. Fonts:
+[Vazirmatn](https://github.com/rastikerdar/vazirmatn) and
+[Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) (both SIL OFL).
 Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 
 ---
@@ -214,13 +230,19 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 ## فارسی
 
 **رامش** یک برنامهٔ کامل پیامک برای اندروید است که برای واقعیت پیامک در ایران ساخته شده و
-ظاهری به سبک Textra دارد که تا آخرین جزئیات قابل شخصی‌سازی است.
+ظاهری دارد که تا آخرین جزئیات قابل شخصی‌سازی است.
 
 پیامک در ایران بیشتر سر و صداست: تبلیغ، تخفیف و کلاهبرداری، لابه‌لای چند کد تأیید که نباید
 از دست بروند. رامش از ابتدا فیلترهای آمادهٔ regex دارد تا این سر و صدا را خفه کند، و یک
 لیست سفید تضمین می‌کند کدهای تأیید و پیام‌های بانکی همیشه برسند.
 
 > رامش برنامه‌ای مستقل با شناسهٔ بستهٔ `com.ramesh.sms` و پروانهٔ آزاد GPL-3.0 است.
+
+**نسخهٔ فعلی: ۱.۰.۰ (بیلد ۱۰۰۰).** یادداشت نسخه‌ها در
+[صفحهٔ ریلیزها](https://github.com/zodiacc7/ramesh/releases) و پوشهٔ
+[`fastlane/metadata/android/fa-IR/changelogs/`](fastlane/metadata/android/fa-IR/changelogs) است؛
+مستندهای طراحی در [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) و بازبینی در
+[docs/REVIEW.md](docs/REVIEW.md).
 
 ### ویژگی‌ها
 
@@ -230,18 +252,24 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
   می‌توانید نگه دارید، خاموش کنید، ویرایش کنید یا همه را پاک کنید و از صفر بسازید.
 - **Filter Studio.** افزودن قانون regex یا متن ساده، آزمایش الگو روی متن نمونه، و
   خروجی/ورودی گرفتن کل قوانین با JSON.
-- **ظاهر به سبک Textra.** تم خودکار/روشن/تیره/مشکی AMOLED، رنگ تأکیدی، شکل حباب با دنباله،
-  رنگ جداگانه برای حباب ارسالی و دریافتی، فونت و اندازهٔ متن، پس‌زمینهٔ گفتگو و عکس مخاطب.
+- **شخصی‌سازی کامل ظاهر.** تم خودکار/روشن/تیره/مشکی AMOLED، رنگ تأکیدی، چهار شکل حباب با
+  دنبالهٔ اختیاری، رنگ جداگانه برای حباب ارسالی و دریافتی، فونت و اندازهٔ متن، شش رنگ پس‌زمینه
+  یا هر عکسی از گالری، و عکس مخاطب.
 - **دو سیم‌کارت، درست و کامل.** انتخاب سیم‌کارت برای هر پیام، نمایش سیم‌کارت دریافت‌کننده و
   فیلتر کردن صندوق بر اساس سیم‌کارت.
-- **اعلان‌های آرام.** پیام‌های فیلترشده بی‌صدا می‌رسند، اسپم‌ها هیچ اعلانی نمی‌سازند و اعلان‌ها
-  پاسخ سریع، خوانده‌شدن، حذف اختیاری و دکمهٔ **کپی کد** برای پیامک‌های تأیید دارند.
+- **اعلان آرام، شمارش دیده‌شدنی.** پیام‌های فیلترشده بی‌صدا می‌رسند و اسپم‌ها هیچ اعلانی
+  نمی‌سازند، اما رسیدن اسپم تا وقتی گفتگو را باز نکنید روی نشان تب‌های **همه** و **اسپم**
+  شمرده می‌شود. اعلان‌ها پاسخ سریع، خوانده‌شدن، حذف اختیاری و دکمهٔ **کپی کد** برای پیامک‌های
+  تأیید دارند.
 - **بدون دسترسی اینترنت.** رامش اجازهٔ `INTERNET` ندارد؛ فیلتر، مخاطبین و پردازش تصویر
   کاملاً روی گوشی انجام می‌شود.
 - **پشتیبانی از راست‌به‌چپ.** متن فارسی و عربی با جهت و نشانه‌گذاری درست نمایش داده می‌شود و
   تاریخ‌ها را می‌توان شمسی دید.
-- **واکنش ایموجی.** با نگه‌داشتن هر پیام می‌توانید به آن واکنش بدهید؛ واکنش‌ها روی گوشی ذخیره و
-  زیر حباب نمایش داده می‌شوند.
+- **واکنش‌ها سر جای خودشان.** با نگه‌داشتن هر پیام می‌توانید به آن واکنش بدهید؛ واکنش‌ها روی
+  گوشی ذخیره و زیر حباب نمایش داده می‌شوند. واکنش‌هایی که برنامه‌های دیگر به‌صورت متن می‌فرستند
+  (`Reacted 👍 to "…"`) شناسایی و زیر همان پیام می‌نشینند، نه به‌شکل یک پیام جدا.
+- **انیمیشن ورود و خروج.** انتخاب کنید گفتگوها و صفحه‌ها با کشویی، محو، جهشی یا بدون انیمیشن
+  باز و بسته شوند — و نتیجه را همان‌جا در پیش‌نمایش تنظیمات ببینید.
 - **گزارش تحویل، تأخیر ارسال و پاک‌سازی خودکار.** تأیید تحویل هر پیام، نگه‌داشتن پیام برای
   ۳/۵/۱۰ ثانیه با دکمهٔ لغو، و محدودکردن هر گفتگو به ۵۰۰ تا ۵٬۰۰۰ پیام تا پیام‌های قدیمی خودکار
   حذف شوند.
@@ -259,9 +287,9 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 | بخش | چه چیزی قابل تغییر است |
 | --- | --- |
 | **تم** | خودکار، روشن، تیره یا مشکی واقعی (AMOLED). رنگ تأکیدی از رنگ سیستم اندروید ۱۲ به بالا، یا یکی از نُه رنگ دست‌چین‌شده. |
-| **حباب‌ها** | شکل Textra، گرد، قرصی یا جمع‌وجور؛ دنبالهٔ حباب روشن/خاموش؛ رنگ مستقل حباب ارسالی و دریافتی؛ چهار اندازهٔ متن؛ فونت Vazirmatn، Plus Jakarta یا فونت سیستم. |
-| **پس‌زمینهٔ گفتگو** | شش رنگ ساده یا هر عکسی از گالری (با کاهش اندازه و لایهٔ محو برای خوانایی حباب‌ها). |
-| **گفتگو** | عکس مخاطب کنار پیام‌های دریافتی، جداکنندهٔ امروز/دیروز، ارسال با Enter، شمارندهٔ کاراکتر و لمس تاریخ برای تغییر تقویم شمسی/میلادی. |
+| **حباب‌ها** | شکل کلاسیک، گرد، قرصی یا جمع‌وجور؛ دنبالهٔ حباب روشن/خاموش؛ رنگ مستقل حباب ارسالی و دریافتی؛ چهار اندازهٔ متن؛ فونت Vazirmatn، Plus Jakarta یا فونت سیستم. |
+| **پس‌زمینهٔ گفتگو** | شش رنگ پس‌زمینه یا هر عکسی از گالری (با کاهش اندازه و لایهٔ محو برای خوانایی حباب‌ها). اگر اندروید دسترسی به عکس را پس گرفته باشد، تنظیمات هشدار می‌دهد و بی‌صدا پس‌زمینهٔ خالی نشان نمی‌دهد. |
+| **گفتگو** | عکس مخاطب کنار پیام‌های دریافتی، جداکنندهٔ امروز/دیروز، ارسال با Enter، شمارندهٔ کاراکتر، لمس تاریخ برای تغییر تقویم شمسی/میلادی، و انیمیشن باز و بسته شدن گفتگو. |
 | **صندوق ورودی** | تب‌های گفتگو، فیلتر سیم‌کارت، عکس مخاطب و حالت «فقط مخاطبین». |
 | **اعلان‌ها** | دکمهٔ حذف، دکمهٔ کپی کد، گزارش تحویل و اینکه صفحهٔ قفل چه چیزی را نشان دهد. |
 | **ارسال** | تأخیر در ارسال (خاموش / ۳ / ۵ / ۱۰ ثانیه) با شمارش معکوس و امکان لغو. |
@@ -305,7 +333,8 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 ### نصب
 
 ۱. فایل امضاشدهٔ `ramesh-<version>-universal.apk` را از
-   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) دانلود کنید.
+   [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) دانلود کنید (آخرین نسخه: **۱.۰.۰**،
+   بیلد ۱۰۰۰).
 ۲. نصب کنید و رامش را باز کنید.
 ۳. دسترسی پیامک، مخاطبین و اعلان را بدهید.
 ۴. درخواست «برنامهٔ پیامک پیش‌فرض» را بپذیرید.
@@ -330,11 +359,12 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
   بیرون از Play طبیعی است و با زیادشدن نصب‌ها کم‌رنگ می‌شود.
 * **«برنامهٔ مضر بلاک شد»**: با ADB نصب کنید (`adb install -r ramesh-<version>-universal.apk`) که
   دیالوگ Play Protect را دور می‌زند، و مثبت‌کاذب را از Play Store (پروفایل → Play Protect → help)
-  همراه هش و اثر انگشت بالا گزارش کنید. نسخه‌های پیش‌انتشار پیش از `1.0.0` با کلیدی امضا شده‌اند که
+  همراه هش و اثر انگشت بالا گزارش کنید. نسخه‌های منتشرشده پیش از `1.0.0` با کلیدی امضا شده‌اند که
   اشتباهاً در مخزن عمومی منتشر شده بود و به همین دلیل پرچم می‌خورند؛ **`1.0.0` و نسخه‌های بعد از آن**
   با کلید تازه‌ساخته امضا می‌شوند.
-* **ارتقا از نسخه‌های پیش‌انتشار**: کلید عوض شده، پس اندروید نمی‌تواند درجا آپدیت کند — یک‌بار
-  برنامه را حذف و نسخهٔ `1.0.0` را نصب کنید. `allowBackup="true"` معمولاً تنظیمات رامش را برمی‌گرداند.
+* **ارتقا**: `1.0.0` روی هر نسخه‌ای که با کلید فعلی امضا شده باشد (`1.1.0-beta.18` و بعد از آن) درجا
+  نصب می‌شود. نسخه‌های قدیمی‌تر با کلید بازنشسته امضا شده‌اند و یک‌بار حذف و نصب لازم دارند؛
+  `allowBackup="true"` معمولاً تنظیمات رامش را برمی‌گرداند.
 
 **نسخه‌های آزمایشی.** با هر push روی `main` یک APK دیباگِ امضانشده در پیش‌انتشار
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) منتشر می‌شود. شناسهٔ
@@ -394,9 +424,10 @@ JSON قابل خروجی و ورودی هستند.
 
 ### اعتبار و پروانه
 
-رامش بر پایهٔ [میسگا](https://github.com/mirarr-app/Misga) ساختهٔ Mirarr است و از
-[Textra SMS](https://textra.app) الهام گرفته. فونت‌ها:
-[Vazirmatn](https://github.com/rastikerdar/vazirmatn) و
+رامش بر پایهٔ [میسگا](https://github.com/mirarr-app/Misga) ساختهٔ Mirarr است. شکل حباب‌ها و
+انتخاب‌گر تم آن از چند رابط پیام‌رسان از جمله [Textra SMS](https://textra.app) الهام گرفته شده؛
+هیچ کد، تصویر یا دارایی دیگری از آن برنامه‌ها در رامش استفاده نشده و رامش هیچ وابستگی، تأییدیه یا
+حمایت مالی از سوی آن‌ها ندارد. فونت‌ها: [Vazirmatn](https://github.com/rastikerdar/vazirmatn) و
 [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) (هر دو با پروانهٔ SIL OFL).
 پروانه: **GNU GPL v3** — فایل [LICENSE](LICENSE).
 

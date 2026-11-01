@@ -1170,7 +1170,7 @@ private fun ConversationsTopBar(
                     }
                 }
 
-                // Textra keeps its top bar tidy: everything else lives in an overflow menu.
+                // Keep the top bar tidy: everything else lives in an overflow menu.
                 var showOverflowMenu by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.padding(start = 2.dp, end = 4.dp)) {
                     IconButton(onClick = { showOverflowMenu = true }) {

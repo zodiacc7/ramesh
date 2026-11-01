@@ -14,9 +14,9 @@
     <string name="settings_accent_sub">برای دکمه‌ها، نشان پیام نخوانده و حباب پیش‌فرض</string>
     <string name="settings_accent_system">در اندروید ۱۲ به بالا از رنگ پس‌زمینه پیروی می‌کند</string>
     <string name="settings_bubbles_header">حباب‌ها</string>
-    <string name="settings_bubbles_sub">حباب‌ها، رنگ‌ها و متن پیام به سبک Textra</string>
+    <string name="settings_bubbles_sub">شکل حباب‌ها، رنگ‌ها و متن پیام</string>
     <string name="settings_bubble_style">شکل حباب</string>
-    <string name="settings_bubble_style_sub">سبک Textra یک دنبالهٔ کوچک به گوشهٔ پایین اضافه می‌کند</string>
+    <string name="settings_bubble_style_sub">شکل کلاسیک یک دنبالهٔ کوچک به گوشهٔ پایین اضافه می‌کند</string>
     <string name="settings_bubble_tail">دنبالهٔ حباب</string>
     <string name="settings_bubble_tail_sub">گوشهٔ نوک‌تیز سمت فرستنده</string>
     <string name="settings_sent_color">رنگ حباب ارسالی</string>
@@ -88,7 +88,7 @@
     <string name="settings_auto_delete_sub">برای هر گفتگو. پیام‌های قدیمی‌تر پس از رسیدن به حد مجاز از گوشی حذف می‌شوند؛ پیش‌فرض خاموش است.</string>
     <string name="settings_reset_header">بازنشانی</string>
     <string name="settings_restore_look">بازگردانی ظاهر پیش‌فرض</string>
-    <string name="settings_restore_look_sub">تم فیروزه‌ای، حباب Textra، بدون پس‌زمینه</string>
+    <string name="settings_restore_look_sub">تم فیروزه‌ای، حباب کلاسیک، بدون پس‌زمینه</string>
     <string name="settings_restore_title">ظاهر پیش‌فرض بازگردانده شود؟</string>
     <string name="settings_restore_body">تم، حباب‌ها، فونت‌ها و پس‌زمینه به حالت پیش‌فرض برمی‌گردند. پیام‌ها و فیلترها دست نمی‌خورند.</string>
     <string name="settings_preview_in">رامش این‌طور دیده می‌شود</string>
@@ -116,7 +116,7 @@
     <string name="settings_about_sub">اطلاعات نسخه و پروژه</string>
     <string name="settings_about_app">دربارهٔ رامش</string>
     <string name="settings_about_version">نسخهٔ %1$s</string>
-    <string name="settings_about_body">رامش یک پیام‌رسان SMS سریع و خصوصی با ظاهر سبک Textra، رابط فارسی و انگلیسی، تب‌های فرستنده، فیلتر اسپم و بدون تبلیغات و ردیاب است.</string>
+    <string name="settings_about_body">رامش یک پیام‌رسان SMS سریع و خصوصی با شخصی‌سازی کامل ظاهر، رابط فارسی و انگلیسی، تب‌های فرستنده، فیلتر اسپم و بدون تبلیغات و ردیاب است.</string>
     <string name="settings_about_source">کد منبع: github.com/zodiacc7/ramesh</string>
     <string name="settings_about_close">بستن</string>
 </resources>

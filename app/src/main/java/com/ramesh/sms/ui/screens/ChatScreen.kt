@@ -1073,7 +1073,7 @@ private fun ChatMessageList(
             val isHighlighted = message.id == highlightedMessageId
             val simSlotNumber = if (hasMultipleSims) simSlotMap[message.subId] else null
             val olderMessage = reversedMessages.getOrNull(index + 1)
-            // Like Telegram/Textra: one avatar per run of incoming messages.
+            // One avatar per run of incoming messages.
             val newerMessage = reversedMessages.getOrNull(index - 1)
             val showAvatarForMessage = look.showChatAvatars &&
                 !message.isSent &&

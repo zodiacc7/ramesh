@@ -106,7 +106,7 @@ fun CustomizationSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Textra-style appearance lives in the full settings screen.
+            // Full appearance settings live in the settings screen.
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer

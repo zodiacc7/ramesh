@@ -82,6 +82,10 @@ drops the affected verdicts so the next read re-evaluates.
 | `ramesh_prefs` | 14 behavioural settings (tabs, SIM badge, delivery reports, send delay, auto-delete, lock-screen privacy, language, calendar scope, …) |
 | `ramesh_appearance` | 19 look-and-feel settings (`Appearance` / `AppearanceStore`) |
 
+`AppearanceStore` serialises enums by `Enum.name`, so a renamed constant would silently reset a
+user's choice. `readEnum` therefore maps legacy names (`BubbleStyle.TEXTRA` → `CLASSIC`, renamed in
+1.0.0) instead of falling back to the default.
+
 `cached_threads` is a snapshot that lets the inbox paint immediately on launch; it is replaced on
 every successful provider read.
 

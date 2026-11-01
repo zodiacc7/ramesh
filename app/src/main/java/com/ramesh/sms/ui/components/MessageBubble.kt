@@ -306,7 +306,7 @@ private fun BubbleContent(
     }
 }
 
-/** Textra-style day divider shown between message groups. */
+/** Day divider shown between message groups. */
 @Composable
 fun ChatDateHeader(text: String, modifier: Modifier = Modifier) {
     Box(

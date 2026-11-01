@@ -215,7 +215,7 @@ fun SettingsActionRow(
 }
 
 /**
- * A Textra-like option row: title plus a horizontally scrolling strip of pills.
+ * An option row: title plus a horizontally scrolling strip of pills.
  */
 @Composable
 fun SettingsChoiceRow(
@@ -270,7 +270,7 @@ fun SettingsChoiceRow(
 }
 
 /**
- * A Textra-like slider row: title, subtitle and the current value on the trailing edge, with a
+ * A slider row: title, subtitle and the current value on the trailing edge, with a
  * [Slider] underneath. Used for values that read better as a continuous control (send delay,
  * auto-delete limit) instead of a strip of pills.
  */
@@ -476,7 +476,7 @@ fun ColorOptionPill(
     }
 }
 
-/** Row of round accent swatches, like Textra's theme colour picker. */
+/** Row of round accent swatches, used as the accent colour picker. */
 @Composable
 fun AccentSwatchPicker(
     selected: AccentColor,
