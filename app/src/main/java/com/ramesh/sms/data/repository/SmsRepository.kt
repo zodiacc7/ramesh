@@ -27,12 +27,10 @@ import com.ramesh.sms.data.util.AppPreferences
 import com.ramesh.sms.data.util.PhoneNumberKeys
 import com.ramesh.sms.data.util.SmsReactionParser
 import com.ramesh.sms.data.util.foldSmsReactions
-import com.ramesh.sms.data.util.resolveInboxAction
 import com.ramesh.sms.data.util.UserPreferences
 import com.ramesh.sms.engine.FilterRulesCache
 import com.ramesh.sms.engine.IncomingSmsPolicy
 import com.ramesh.sms.engine.NotificationHelper
-import com.ramesh.sms.engine.PreparedFilterRules
 import com.ramesh.sms.engine.SmsFilterEngine
 import com.ramesh.sms.receiver.SmsSendTracker
 import com.ramesh.sms.receiver.SmsSentReceiver
@@ -118,13 +116,153 @@ class SmsRepository(
      * on the previous list.
      */
     suspend fun loadThreads(): ThreadsLoadResult = withContext(Dispatchers.IO) {
-        val threads = mutableListOf<ConversationThread>()
-        val contentResolver = context.contentResolver
+        try {
+            val threadRows = readThreadRows()
+                ?: return@withContext ThreadsLoadResult(getCachedThreads(), emptyList())
+            if (threadRows.isEmpty()) {
+                dbHelper.replaceCachedThreads(emptyList())
+                return@withContext ThreadsLoadResult(emptyList(), emptyList())
+            }
 
+            val threadIds = threadRows.mapTo(LinkedHashSet(threadRows.size)) { it.threadId }
+            val canonicalAddresses = loadCanonicalAddressMap()
+            val contactDetails = loadContactDetailMap()
+            val contactNames = contactDetails.mapValues { it.value.name }
+
+            // Each of these is exactly one provider query, no matter how many conversations exist.
+            val unread = readUnreadSnapshot()
+            val latestInbox = readLatestInboxMessages(threadIds)
+            val threadSubIds = readThreadSubIds(threadIds)
+
+            val metaIds = LinkedHashSet<Long>(threadIds.size * 2)
+            latestInbox.values.forEach { metaIds.add(it.messageId) }
+            unread.latestUnreadByThread.values.forEach { metaIds.add(it.messageId) }
+            val spamMetaMap = dbHelper.getSpamMetaMapForIds(metaIds)
+            // Spam is silent and stored read, so it never shows in a thread's unread count. The
+            // badges read this map to prove that a spam message arrived without a notification.
+            val newSpamByAddress = dbHelper.getNewSpamCounts()
+
+            // The cached rules and sender preferences are served from memory by FilterRulesCache,
+            // so they are always available - a sender blocked a second ago must win over a stale
+            // verdict stored for this message.
+            val cache = FilterRulesCache.getInstance(dbHelper)
+            val evaluator = InboxActionEvaluator(
+                storedMeta = spamMetaMap,
+                senderPreferences = cache.senderPreferences(),
+                preparedRules = cache.preparedRules(),
+                noSpamForContacts = userPreferences.noSpamForContacts,
+                normalizeAddress = { dbHelper.normalizeAddress(it) }
+            )
+
+            val addresses = HashMap<Long, String>(threadRows.size)
+            val contactState = HashMap<Long, Boolean>(threadRows.size)
+            for (row in threadRows) {
+                val address = resolveRecipientAddress(row.recipientIds, canonicalAddresses)
+                val contactName = PhoneNumberKeys.lookupValue(contactDetails, address)?.name
+                    ?: PhoneNumberKeys.lookup(contactNames, address)
+                addresses[row.threadId] = address
+                contactState[row.threadId] = !contactName.isNullOrBlank()
+            }
+
+            // The verdict on the newest message of every conversation drives the row.
+            val lastActionByThread = HashMap<Long, FilterAction>(threadRows.size)
+            for (row in threadRows) {
+                val lastInbox = latestInbox[row.threadId] ?: continue
+                lastActionByThread[row.threadId] = evaluator.actionFor(
+                    messageId = lastInbox.messageId,
+                    address = addresses.getValue(row.threadId),
+                    body = lastInbox.body,
+                    isContact = contactState.getValue(row.threadId)
+                )
+            }
+
+            // A conversation whose newest message is spam may be spam-only. One batched query for
+            // all of them replaces the old one-query-per-conversation check (an N+1 that ran on
+            // every refresh).
+            val spamCandidates = lastActionByThread.filterValues { it == FilterAction.SPAM }.keys
+            val spamOnly = if (spamCandidates.isEmpty()) {
+                emptySet()
+            } else {
+                spamOnlyThreads(readInboxRowsForThreads(spamCandidates)) { inboxRow ->
+                    val threadId = inboxRow.threadId
+                    evaluator.actionFor(
+                        messageId = inboxRow.messageId,
+                        address = addresses[threadId] ?: "",
+                        body = inboxRow.body,
+                        isContact = contactState[threadId] ?: false
+                    )
+                }
+            }
+
+            val threads = ArrayList<ConversationThread>(threadRows.size)
+            for (row in threadRows) {
+                val threadId = row.threadId
+                val address = addresses.getValue(threadId)
+                val isContact = contactState.getValue(threadId)
+
+                // A conversation that only ever received spam has nothing to show.
+                if (IncomingSmsPolicy.isGhostConversation(address, row.snippet)) {
+                    continue
+                }
+
+                val contactDetail = PhoneNumberKeys.lookupValue(contactDetails, address)
+                val unreadCount = unread.countFor(threadId)
+                val lastInbox = latestInbox[threadId]
+                val lastMessageAction = lastActionByThread[threadId] ?: FilterAction.NORMAL
+                val isUnreadSpam = unreadCount > 0 && unread.latestFor(threadId)?.let { latest ->
+                    evaluator.actionFor(
+                        messageId = latest.messageId,
+                        address = address,
+                        body = latest.body,
+                        isContact = isContact
+                    ) == FilterAction.SPAM
+                } == true
+
+                threads.add(
+                    ConversationThread(
+                        threadId = threadId,
+                        address = address,
+                        contactName = contactDetail?.name
+                            ?: PhoneNumberKeys.lookup(contactNames, address),
+                        snippet = inboxSnippet(row.snippet, lastInbox?.body),
+                        date = row.date,
+                        messageCount = row.messageCount,
+                        unreadCount = unreadCount,
+                        newSpamCount = newSpamByAddress[PhoneNumberKeys.canonical(address)] ?: 0,
+                        hasSpam = lastMessageAction == FilterAction.SPAM || isUnreadSpam,
+                        spamOnly = threadId in spamOnly,
+                        isUnreadSpam = isUnreadSpam,
+                        lastMessageAction = lastMessageAction,
+                        subId = threadSubIds[threadId] ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID,
+                        photoUri = contactDetail?.photoUri,
+                        contactLookupUri = contactDetail?.lookupUri
+                    )
+                )
+            }
+
+            dbHelper.replaceCachedThreads(threads)
+            ThreadsLoadResult(
+                threads = threads,
+                pendingSpamMarks = evaluator.pendingMarks.toList()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading threads", e)
+            // Keep the last good snapshot on screen instead of an empty inbox.
+            ThreadsLoadResult(getCachedThreads(), emptyList())
+        }
+    }
+
+    /**
+     * Reads the thread list from the provider, newest first.
+     *
+     * Returns null when the cursor could not be opened (no permission, provider unavailable), which
+     * the caller must not confuse with an empty inbox: writing that empty list into the cache would
+     * wipe the snapshot the UI paints on the next launch.
+     */
+    private fun readThreadRows(): List<ThreadProviderRow>? {
         val uri = Telephony.Threads.CONTENT_URI.buildUpon()
             .appendQueryParameter("simple", "true")
             .build()
-
         val projection = arrayOf(
             Telephony.Threads._ID,
             Telephony.Threads.DATE,
@@ -133,289 +271,176 @@ class SmsRepository(
             Telephony.Threads.SNIPPET,
             Telephony.Threads.READ
         )
+        val rows = ArrayList<ThreadProviderRow>()
+        val cursor = context.contentResolver.query(
+            uri,
+            projection,
+            null, null,
+            "${Telephony.Threads.DATE} DESC"
+        ) ?: return null
+        cursor.use {
+            val idIdx = it.getColumnIndexOrThrow(Telephony.Threads._ID)
+            val dateIdx = it.getColumnIndexOrThrow(Telephony.Threads.DATE)
+            val msgCountIdx = it.getColumnIndexOrThrow(Telephony.Threads.MESSAGE_COUNT)
+            val recipientIdsIdx = it.getColumnIndexOrThrow(Telephony.Threads.RECIPIENT_IDS)
+            val snippetIdx = it.getColumnIndexOrThrow(Telephony.Threads.SNIPPET)
+            val readIdx = it.getColumnIndexOrThrow(Telephony.Threads.READ)
+            while (it.moveToNext()) {
+                rows.add(
+                    ThreadProviderRow(
+                        threadId = it.getLong(idIdx),
+                        date = it.getLong(dateIdx),
+                        messageCount = it.getInt(msgCountIdx),
+                        recipientIds = it.getString(recipientIdsIdx) ?: "",
+                        snippet = it.getString(snippetIdx) ?: "",
+                        read = it.getInt(readIdx) == 1
+                    )
+                )
+            }
+        }
+        return rows
+    }
 
+    /** Unread counters, from one query over the unread inbox, newest first. */
+    private fun readUnreadSnapshot(): UnreadSnapshot {
+        val rows = ArrayList<InboxRow>()
         try {
-            val threadRows = mutableListOf<ThreadProviderRow>()
-            val threadIds = mutableSetOf<Long>()
-            var threadsCursorOk = false
-
-            val cursor = contentResolver.query(
-                uri,
-                projection,
-                null, null,
-                "${Telephony.Threads.DATE} DESC"
-            )
-            cursor?.use {
-                threadsCursorOk = true
-                val idIdx = it.getColumnIndexOrThrow(Telephony.Threads._ID)
-                val dateIdx = it.getColumnIndexOrThrow(Telephony.Threads.DATE)
-                val msgCountIdx = it.getColumnIndexOrThrow(Telephony.Threads.MESSAGE_COUNT)
-                val recipientIdsIdx = it.getColumnIndexOrThrow(Telephony.Threads.RECIPIENT_IDS)
-                val snippetIdx = it.getColumnIndexOrThrow(Telephony.Threads.SNIPPET)
-                val readIdx = it.getColumnIndexOrThrow(Telephony.Threads.READ)
-
+            val cursor = context.contentResolver.query(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID, Telephony.Sms.BODY),
+                "${Telephony.Sms.READ} = 0",
+                null,
+                "${Telephony.Sms.DATE} DESC"
+            ) ?: return buildUnreadSnapshot(emptyList())
+            cursor.use {
+                val idIdx = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val threadIdx = it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
                 while (it.moveToNext()) {
-                    val threadId = it.getLong(idIdx)
-                    threadIds.add(threadId)
-                    threadRows.add(
-                        ThreadProviderRow(
-                            threadId = threadId,
-                            date = it.getLong(dateIdx),
-                            messageCount = it.getInt(msgCountIdx),
-                            recipientIds = it.getString(recipientIdsIdx) ?: "",
-                            snippet = it.getString(snippetIdx) ?: "",
-                            read = it.getInt(readIdx) == 1
+                    rows.add(
+                        InboxRow(
+                            messageId = it.getLong(idIdx),
+                            threadId = it.getLong(threadIdx),
+                            body = it.getString(bodyIdx) ?: ""
                         )
                     )
                 }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying unread batch", e)
+        }
+        return buildUnreadSnapshot(rows)
+    }
 
-            val canonicalAddresses = loadCanonicalAddressMap()
-            val contactDetails = loadContactDetailMap()
-            val contactNames = contactDetails.mapValues { it.value.name }
+    /** The newest received message of every thread, newest first, in one query. */
+    private fun readLatestInboxMessages(threadIds: Set<Long>): Map<Long, InboxRow> {
+        if (threadIds.isEmpty()) return emptyMap()
+        val rows = ArrayList<InboxRow>()
+        val remaining = threadIds.toMutableSet()
+        try {
+            val cursor = context.contentResolver.query(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID, Telephony.Sms.BODY),
+                null,
+                null,
+                "${Telephony.Sms.DATE} DESC"
+            ) ?: return emptyMap()
+            cursor.use {
+                val idIdx = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val threadIdx = it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                // Stops as soon as every conversation has its newest message.
+                while (it.moveToNext() && remaining.isNotEmpty()) {
+                    val threadId = it.getLong(threadIdx)
+                    if (remaining.remove(threadId)) {
+                        rows.add(
+                            InboxRow(
+                                messageId = it.getLong(idIdx),
+                                threadId = threadId,
+                                body = it.getString(bodyIdx) ?: ""
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying latest inbox batch", e)
+        }
+        return latestInboxByThread(rows)
+    }
 
-            // Batch query all unread messages in a single fast query
-            val unreadCounts = mutableMapOf<Long, Int>()
-            val latestUnreadMessage = mutableMapOf<Long, Pair<Long, String>>() // threadId -> (msgId, body)
+    /** The subscription every thread was last delivered on, in one query. */
+    private fun readThreadSubIds(threadIds: Set<Long>): Map<Long, Int> {
+        if (threadIds.isEmpty()) return emptyMap()
+        val result = HashMap<Long, Int>(threadIds.size)
+        val remaining = threadIds.toMutableSet()
+        try {
+            val cursor = context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(Telephony.Sms.THREAD_ID, Telephony.Sms.SUBSCRIPTION_ID),
+                null,
+                null,
+                "${Telephony.Sms.DATE} DESC"
+            ) ?: return emptyMap()
+            cursor.use {
+                val threadIdx = it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                val subIdx = it.getColumnIndex(Telephony.Sms.SUBSCRIPTION_ID)
+                while (it.moveToNext() && remaining.isNotEmpty()) {
+                    val threadId = it.getLong(threadIdx)
+                    if (remaining.remove(threadId)) {
+                        result[threadId] = if (subIdx >= 0 && !it.isNull(subIdx)) {
+                            it.getInt(subIdx)
+                        } else {
+                            SubscriptionManager.INVALID_SUBSCRIPTION_ID
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying thread SIM subscriptions", e)
+        }
+        return result
+    }
+
+    /**
+     * Every received message of [threadIds], in one batched query.
+     *
+     * Replaces the old `THREAD_ID = ?` query that ran once per conversation to decide whether a
+     * conversation was spam-only. The `IN (...)` list is chunked because SQLite refuses statements
+     * with more than ~999 bound arguments.
+     */
+    private fun readInboxRowsForThreads(threadIds: Collection<Long>): List<InboxRow> {
+        if (threadIds.isEmpty()) return emptyList()
+        val rows = ArrayList<InboxRow>()
+        for (chunk in threadIds.distinct().chunked(SQLITE_IN_CHUNK_SIZE)) {
+            val placeholders = chunk.joinToString(",") { "?" }
             try {
-                val unreadCursor = contentResolver.query(
+                val cursor = context.contentResolver.query(
                     Telephony.Sms.Inbox.CONTENT_URI,
                     arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID, Telephony.Sms.BODY),
-                    "${Telephony.Sms.READ} = 0",
-                    null,
-                    "${Telephony.Sms.DATE} DESC"
-                )
-                unreadCursor?.use { uCursor ->
-                    val idIdx = uCursor.getColumnIndexOrThrow(Telephony.Sms._ID)
-                    val tIdIdx = uCursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
-                    val bodyIdx = uCursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                    while (uCursor.moveToNext()) {
-                        val tId = uCursor.getLong(tIdIdx)
-                        val msgId = uCursor.getLong(idIdx)
-                        val body = uCursor.getString(bodyIdx) ?: ""
-                        // A reaction SMS is folded onto the message it quotes, so it never
-                        // produces a bubble of its own; counting it as unread would leave the
-                        // badge pointing at a message the user cannot see.
-                        if (SmsReactionParser.parse(body) == null) {
-                            unreadCounts[tId] = (unreadCounts[tId] ?: 0) + 1
-                        }
-                        if (!latestUnreadMessage.containsKey(tId)) {
-                            latestUnreadMessage[tId] = Pair(msgId, body)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error querying unread batch", e)
-            }
-
-            val latestInboxMessage = mutableMapOf<Long, Pair<Long, String>>() // threadId -> (msgId, body)
-            val remainingInboxThreadIds = threadIds.toMutableSet()
-            try {
-                if (remainingInboxThreadIds.isNotEmpty()) {
-                    val inboxCursor = contentResolver.query(
-                        Telephony.Sms.Inbox.CONTENT_URI,
-                        arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID, Telephony.Sms.BODY),
-                        null,
-                        null,
-                        "${Telephony.Sms.DATE} DESC"
-                    )
-                    inboxCursor?.use { iCursor ->
-                        val idIdx = iCursor.getColumnIndexOrThrow(Telephony.Sms._ID)
-                        val tIdIdx = iCursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
-                        val bodyIdx = iCursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                        while (iCursor.moveToNext() && remainingInboxThreadIds.isNotEmpty()) {
-                            val tId = iCursor.getLong(tIdIdx)
-                            if (remainingInboxThreadIds.remove(tId)) {
-                                latestInboxMessage[tId] = Pair(
-                                    iCursor.getLong(idIdx),
-                                    iCursor.getString(bodyIdx) ?: ""
-                                )
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error querying latest inbox batch", e)
-            }
-
-            val metaIds = LinkedHashSet<Long>()
-            latestInboxMessage.values.forEach { metaIds.add(it.first) }
-            latestUnreadMessage.values.forEach { metaIds.add(it.first) }
-            val spamMetaMap = dbHelper.getSpamMetaMapForIds(metaIds)
-            // Spam is silent and stored read, so it never shows in a thread's unread count. The
-            // badges read this map to prove that a spam message arrived without a notification.
-            val newSpamByAddress = dbHelper.getNewSpamCounts()
-            val pendingSpamMarks = mutableListOf<SpamMetaWrite>()
-            val evaluatedActions = mutableMapOf<Long, FilterAction>()
-
-            // The cached rules and sender preferences are served from memory by FilterRulesCache,
-            // so they are always available - a sender blocked a second ago must win over a stale
-            // verdict stored for this message.
-            val cache = FilterRulesCache.getInstance(dbHelper)
-            val preparedRules = cache.preparedRules()
-            val senderPrefs = cache.senderPreferences()
-
-            fun actionFor(msgId: Long, address: String, body: String, isContact: Boolean): FilterAction {
-                evaluatedActions[msgId]?.let { return it }
-                val preferred = senderPrefs[dbHelper.normalizeAddress(address)]
-                val decided = resolveInboxAction(
-                    storedAction = spamMetaMap[msgId]?.action,
-                    isSenderBlocked = preferred?.isBlocked == true,
-                    isContact = isContact,
-                    noSpamForContacts = userPreferences.noSpamForContacts
-                )
-                val action = decided ?: run {
-                    val eval = SmsFilterEngine.evaluateMessage(
-                        sender = address,
-                        body = body,
-                        prepared = preparedRules,
-                        senderPreference = preferred,
-                        isContact = isContact,
-                        noSpamForContacts = userPreferences.noSpamForContacts
-                    )
-                    if (eval.action != FilterAction.NORMAL) {
-                        pendingSpamMarks.add(
-                            SpamMetaWrite(
-                                messageId = msgId,
-                                address = address,
-                                matchedRuleName = eval.matchedRuleName,
-                                action = eval.action
+                    "${Telephony.Sms.THREAD_ID} IN ($placeholders)",
+                    chunk.map { it.toString() }.toTypedArray(),
+                    null
+                ) ?: continue
+                cursor.use {
+                    val idIdx = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                    val threadIdx = it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                    val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                    while (it.moveToNext()) {
+                        rows.add(
+                            InboxRow(
+                                messageId = it.getLong(idIdx),
+                                threadId = it.getLong(threadIdx),
+                                body = it.getString(bodyIdx) ?: ""
                             )
                         )
                     }
-                    eval.action
-                }
-                evaluatedActions[msgId] = action
-                return action
-            }
-
-            // A conversation whose messages are all spam has nothing left to show; it must not
-            // surface as an empty row in the inbox or in a "not spam" filter tab.
-            val spamOnlyByThread = mutableMapOf<Long, Boolean>()
-            fun threadHasOnlySpam(threadId: Long, address: String, isContact: Boolean): Boolean {
-                spamOnlyByThread[threadId]?.let { return it }
-                var onlySpam = true
-                try {
-                    contentResolver.query(
-                        Telephony.Sms.Inbox.CONTENT_URI,
-                        arrayOf(Telephony.Sms._ID, Telephony.Sms.BODY),
-                        "${Telephony.Sms.THREAD_ID} = ?",
-                        arrayOf(threadId.toString()),
-                        null
-                    )?.use { spamCursor ->
-                        val idIdx = spamCursor.getColumnIndexOrThrow(Telephony.Sms._ID)
-                        val bodyIdx = spamCursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                        while (spamCursor.moveToNext()) {
-                            val action = actionFor(
-                                spamCursor.getLong(idIdx),
-                                address,
-                                spamCursor.getString(bodyIdx) ?: "",
-                                isContact
-                            )
-                            if (action != FilterAction.SPAM) {
-                                onlySpam = false
-                                break
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error checking spam-only thread $threadId", e)
-                    onlySpam = false
-                }
-                spamOnlyByThread[threadId] = onlySpam
-                return onlySpam
-            }
-
-            val threadSubIds = mutableMapOf<Long, Int>()
-            val remainingThreadIdsForSub = threadIds.toMutableSet()
-            try {
-                if (remainingThreadIdsForSub.isNotEmpty()) {
-                    val subCursor = contentResolver.query(
-                        Telephony.Sms.CONTENT_URI,
-                        arrayOf(Telephony.Sms.THREAD_ID, Telephony.Sms.SUBSCRIPTION_ID),
-                        null, null,
-                        "${Telephony.Sms.DATE} DESC"
-                    )
-                    subCursor?.use { sCursor ->
-                        val tIdIdx = sCursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
-                        val subIdIdx = sCursor.getColumnIndex(Telephony.Sms.SUBSCRIPTION_ID)
-                        while (sCursor.moveToNext() && remainingThreadIdsForSub.isNotEmpty()) {
-                            val tId = sCursor.getLong(tIdIdx)
-                            if (remainingThreadIdsForSub.remove(tId)) {
-                                val subId = if (subIdIdx >= 0 && !sCursor.isNull(subIdIdx)) {
-                                    sCursor.getInt(subIdIdx)
-                                } else {
-                                    SubscriptionManager.INVALID_SUBSCRIPTION_ID
-                                }
-                                threadSubIds[tId] = subId
-                            }
-                        }
-                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error querying thread SIM subscriptions", e)
+                Log.e(TAG, "Error reading inbox rows for ${chunk.size} thread(s)", e)
             }
-
-            for (row in threadRows) {
-                val threadId = row.threadId
-                val address = resolveRecipientAddress(row.recipientIds, canonicalAddresses)
-                val contactDetail = PhoneNumberKeys.lookupValue(contactDetails, address)
-                val contactName = contactDetail?.name ?: PhoneNumberKeys.lookup(contactNames, address)
-                val isContact = !contactName.isNullOrBlank()
-                val photoUri = contactDetail?.photoUri
-                val contactLookupUri = contactDetail?.lookupUri
-
-                val unreadCount = unreadCounts[threadId] ?: 0
-                val lastInbox = latestInboxMessage[threadId]
-                val lastMessageAction = if (lastInbox != null) {
-                    actionFor(lastInbox.first, address, lastInbox.second, isContact)
-                } else {
-                    FilterAction.NORMAL
-                }
-                val isUnreadSpam = unreadCount > 0 && latestUnreadMessage[threadId]?.let { latest ->
-                    actionFor(latest.first, address, latest.second, isContact) == FilterAction.SPAM
-                } == true
-                val spamOnly = lastMessageAction == FilterAction.SPAM &&
-                    threadHasOnlySpam(threadId, address, isContact)
-
-                if (IncomingSmsPolicy.isGhostConversation(address, row.snippet)) {
-                    continue
-                }
-
-                val subId = threadSubIds[threadId] ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID
-
-                threads.add(
-                    ConversationThread(
-                        threadId = threadId,
-                        address = address,
-                        contactName = contactName,
-                        snippet = inboxSnippet(row.snippet, lastInbox?.second),
-                        date = row.date,
-                        messageCount = row.messageCount,
-                        unreadCount = unreadCount,
-                        newSpamCount = newSpamByAddress[PhoneNumberKeys.canonical(address)] ?: 0,
-                        hasSpam = lastMessageAction == FilterAction.SPAM || isUnreadSpam,
-                        spamOnly = spamOnly,
-                        isUnreadSpam = isUnreadSpam,
-                        lastMessageAction = lastMessageAction,
-                        subId = subId,
-                        photoUri = photoUri,
-                        contactLookupUri = contactLookupUri
-                    )
-                )
-            }
-
-            if (threadsCursorOk) {
-                dbHelper.replaceCachedThreads(threads)
-            }
-            return@withContext ThreadsLoadResult(
-                threads = threads,
-                pendingSpamMarks = pendingSpamMarks.toList()
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reading threads", e)
-            return@withContext ThreadsLoadResult(threads = threads, pendingSpamMarks = emptyList())
         }
+        return rows
     }
 
     suspend fun getMessagesForThread(

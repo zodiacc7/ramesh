@@ -118,11 +118,20 @@ jobs:
           # Prefer the curated notes that ship with the app (fastlane changelogs). Generated notes
           # stop being useful once older releases are removed, and they cannot mention anything
           # that is not a pull request title.
+          # The notes are bilingual: the English changelog, then the Persian one under its own
+          # heading. Both live in fastlane, keyed by versionCode.
           NOTES="--generate-notes"
-          NOTES_FILE="fastlane/metadata/android/en-US/changelogs/${CODE}.txt"
-          if [[ -f "$NOTES_FILE" ]]; then
-            NOTES="--notes-file $NOTES_FILE"
-            echo "Using release notes from $NOTES_FILE"
+          EN_NOTES="fastlane/metadata/android/en-US/changelogs/${CODE}.txt"
+          FA_NOTES="fastlane/metadata/android/fa-IR/changelogs/${CODE}.txt"
+          if [[ -f "$EN_NOTES" ]]; then
+            BODY="$RUNNER_TEMP/release-notes.md"
+            cat "$EN_NOTES" > "$BODY"
+            if [[ -f "$FA_NOTES" ]]; then
+              printf '\n\n---\n\n## فارسی\n\n' >> "$BODY"
+              cat "$FA_NOTES" >> "$BODY"
+            fi
+            NOTES="--notes-file $BODY"
+            echo "Using release notes from $EN_NOTES (+ $FA_NOTES)"
           fi
           ls -l "$APK" dist/SHA256SUMS
 

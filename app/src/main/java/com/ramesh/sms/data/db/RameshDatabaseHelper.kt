@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import android.telephony.SubscriptionManager
@@ -127,21 +128,16 @@ class RameshDatabaseHelper private constructor(context: Context) :
         super.onOpen(db)
         // Defensive: older builds created sender_tabs without the filter mask, and a DB that was
         // already stamped with the new version would never run the migration. Adding the column
-        // here is idempotent (the duplicate-column error is swallowed).
-        try {
+        // here is idempotent (a duplicate column is expected and ignored by [migrate]).
+        migrate("sender_tabs.filter_mask") {
             db.execSQL("ALTER TABLE sender_tabs ADD COLUMN filter_mask INTEGER NOT NULL DEFAULT 0")
-        } catch (_: Exception) {
-            // column already present
         }
-        try {
+        // On an up-to-date database the column is already there; that is expected and quiet.
+        migrate("spam_message_meta.is_new") {
             db.execSQL("ALTER TABLE spam_message_meta ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0")
-        } catch (_: Exception) {
-            // column already present
         }
-        try {
+        migrate("cached_threads.new_spam_count") {
             db.execSQL("ALTER TABLE cached_threads ADD COLUMN new_spam_count INTEGER NOT NULL DEFAULT 0")
-        } catch (_: Exception) {
-            // column already present
         }
         if (predefinedRulesSeeded) return
         seedPredefinedRules(db)
@@ -150,43 +146,90 @@ class RameshDatabaseHelper private constructor(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
-            try { db.execSQL("ALTER TABLE filter_rules ADD COLUMN list_type TEXT DEFAULT 'BLOCKLIST'") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN name TEXT") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN pattern TEXT") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_regex INTEGER DEFAULT 1") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN list_type TEXT DEFAULT 'BLOCKLIST'") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_deleted INTEGER DEFAULT 0") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN description TEXT") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_customized INTEGER DEFAULT 0") } catch (e: Exception) {}
+            migrate("filter_rules.list_type") {
+                db.execSQL("ALTER TABLE filter_rules ADD COLUMN list_type TEXT DEFAULT 'BLOCKLIST'")
+            }
+            migrate("predefined_rule_settings.name") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN name TEXT")
+            }
+            migrate("predefined_rule_settings.pattern") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN pattern TEXT")
+            }
+            migrate("predefined_rule_settings.is_regex") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_regex INTEGER DEFAULT 1")
+            }
+            migrate("predefined_rule_settings.list_type") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN list_type TEXT DEFAULT 'BLOCKLIST'")
+            }
+            migrate("predefined_rule_settings.is_deleted") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_deleted INTEGER DEFAULT 0")
+            }
+            migrate("predefined_rule_settings.description") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN description TEXT")
+            }
+            migrate("predefined_rule_settings.is_customized") {
+                db.execSQL("ALTER TABLE predefined_rule_settings ADD COLUMN is_customized INTEGER DEFAULT 0")
+            }
             createCachedThreadsTable(db)
-            try { db.execSQL("ALTER TABLE cached_threads ADD COLUMN last_message_action TEXT DEFAULT 'NORMAL'") } catch (e: Exception) {}
-            try { db.execSQL("CREATE INDEX IF NOT EXISTS idx_spam_meta_address ON spam_message_meta(address)") } catch (e: Exception) {}
+            migrate("cached_threads.last_message_action") {
+                db.execSQL("ALTER TABLE cached_threads ADD COLUMN last_message_action TEXT DEFAULT 'NORMAL'")
+            }
+            migrate("index idx_spam_meta_address") {
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_spam_meta_address ON spam_message_meta(address)")
+            }
         }
         if (oldVersion < 3) {
-            try {
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS idx_filter_rules_sender_target ON filter_rules(sender_target)"
-                )
-            } catch (e: Exception) {}
+            migrate("index idx_filter_rules_sender_target") {
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_filter_rules_sender_target ON filter_rules(sender_target)")
+            }
         }
         if (oldVersion < 4) {
-            try {
-                createSenderTabsTables(db)
-            } catch (e: Exception) {}
+            migrate("createSenderTabsTables") { createSenderTabsTables(db) }
         }
         if (oldVersion < 5) {
-            try { db.execSQL("ALTER TABLE sender_preferences ADD COLUMN preferred_sub_id INTEGER NOT NULL DEFAULT -1") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE cached_threads ADD COLUMN sub_id INTEGER NOT NULL DEFAULT -1") } catch (e: Exception) {}
+            migrate("sender_preferences.preferred_sub_id") {
+                db.execSQL("ALTER TABLE sender_preferences ADD COLUMN preferred_sub_id INTEGER NOT NULL DEFAULT -1")
+            }
+            migrate("cached_threads.sub_id") {
+                db.execSQL("ALTER TABLE cached_threads ADD COLUMN sub_id INTEGER NOT NULL DEFAULT -1")
+            }
         }
         if (oldVersion < 6) {
-            try { createMessageReactionsTable(db) } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE sender_tabs ADD COLUMN filter_mask INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
+            migrate("createMessageReactionsTable") { createMessageReactionsTable(db) }
+            migrate("sender_tabs.filter_mask") {
+                db.execSQL("ALTER TABLE sender_tabs ADD COLUMN filter_mask INTEGER NOT NULL DEFAULT 0")
+            }
         }
         if (oldVersion < 7) {
             // Spam is delivered silently, but it still has to be countable: every spam verdict
             // carries a "not looked at yet" flag that the tab badges read and the inbox clears.
-            try { db.execSQL("ALTER TABLE spam_message_meta ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
-            try { db.execSQL("ALTER TABLE cached_threads ADD COLUMN new_spam_count INTEGER NOT NULL DEFAULT 0") } catch (e: Exception) {}
+            migrate("spam_message_meta.is_new") {
+                db.execSQL("ALTER TABLE spam_message_meta ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0")
+            }
+            migrate("cached_threads.new_spam_count") {
+                db.execSQL("ALTER TABLE cached_threads ADD COLUMN new_spam_count INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
+
+    /**
+     * Runs one schema step of [onUpgrade] or [onOpen].
+     *
+     * Steps used to be wrapped in `catch (e: Exception) {}`: a migration that failed left the
+     * database half upgraded and the failure only surfaced later, as a "no such column" crash in a
+     * SELECT. Two outcomes are now distinguished: a step that finds its column already present is
+     * the normal state of an up-to-date database and stays quiet, everything else is logged with the
+     * step name so a damaged schema is visible in logcat instead of silent.
+     */
+    private fun migrate(step: String, action: () -> Unit) {
+        try {
+            action()
+        } catch (e: SQLiteException) {
+            if (e.message?.contains("duplicate column", ignoreCase = true) != true) {
+                Log.w(TAG, "Schema migration step '$step' failed", e)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Schema migration step '$step' failed", e)
         }
     }
 
@@ -866,57 +909,64 @@ class RameshDatabaseHelper private constructor(context: Context) :
         threads
     }
 
+    /**
+     * Replaces the cached snapshot with [threads].
+     *
+     * This is a diff, not a rewrite: only rows whose stored values actually changed are written and
+     * conversations that disappeared are deleted. The inbox writes this snapshot on every refresh
+     * (each incoming SMS, each return from a chat), so rewriting every column of every row for a
+     * single new message was wasted I/O on the main refresh path.
+     */
     suspend fun replaceCachedThreads(threads: List<ConversationThread>) = withContext(Dispatchers.IO) {
         val db = writableDatabase
         db.beginTransaction()
         try {
-            if (threads.isEmpty()) {
+            val keepIds = threads.map { it.threadId }.distinct()
+            if (keepIds.isEmpty()) {
                 db.delete("cached_threads", null, null)
+            } else if (keepIds.size <= SQLITE_IN_CHUNK_SIZE) {
+                val placeholders = keepIds.joinToString(",") { "?" }
+                val args = keepIds.map { it.toString() }.toTypedArray()
+                db.delete("cached_threads", "thread_id NOT IN ($placeholders)", args)
             } else {
-                val keepIds = threads.map { it.threadId }.distinct()
-                if (keepIds.size <= SQLITE_IN_CHUNK_SIZE) {
-                    val placeholders = keepIds.joinToString(",") { "?" }
-                    val args = keepIds.map { it.toString() }.toTypedArray()
-                    db.delete("cached_threads", "thread_id NOT IN ($placeholders)", args)
-                } else {
-                    val keepSet = keepIds.toHashSet()
-                    val toDelete = mutableListOf<Long>()
-                    db.query(
-                        "cached_threads",
-                        arrayOf("thread_id"),
-                        null, null, null, null, null
-                    ).use { cursor ->
-                        val idIdx = cursor.getColumnIndexOrThrow("thread_id")
-                        while (cursor.moveToNext()) {
-                            val id = cursor.getLong(idIdx)
-                            if (id !in keepSet) toDelete.add(id)
-                        }
-                    }
-                    for (chunk in toDelete.chunked(SQLITE_IN_CHUNK_SIZE)) {
-                        val placeholders = chunk.joinToString(",") { "?" }
-                        val args = chunk.map { it.toString() }.toTypedArray()
-                        db.delete("cached_threads", "thread_id IN ($placeholders)", args)
+                val keepSet = keepIds.toHashSet()
+                val toDelete = mutableListOf<Long>()
+                db.query(
+                    "cached_threads",
+                    arrayOf("thread_id"),
+                    null, null, null, null, null
+                ).use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow("thread_id")
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idIdx)
+                        if (id !in keepSet) toDelete.add(id)
                     }
                 }
-                for (thread in threads) {
-                    val cv = ContentValues().apply {
-                        put("thread_id", thread.threadId)
-                        put("address", thread.address)
-                        put("contact_name", thread.contactName)
-                        put("snippet", thread.snippet)
-                        put("date", thread.date)
-                        put("message_count", thread.messageCount)
-                        put("unread_count", thread.unreadCount)
-                        put("is_unread_spam", if (thread.isUnreadSpam) 1 else 0)
-                        put("has_spam", if (thread.hasSpam) 1 else 0)
-                        put("last_message_action", thread.lastMessageAction.name)
-                        put("sub_id", thread.subId)
-                        put("new_spam_count", thread.newSpamCount)
+                for (chunk in toDelete.chunked(SQLITE_IN_CHUNK_SIZE)) {
+                    val placeholders = chunk.joinToString(",") { "?" }
+                    val args = chunk.map { it.toString() }.toTypedArray()
+                    db.delete("cached_threads", "thread_id IN ($placeholders)", args)
+                }
+            }
+
+            if (threads.isNotEmpty()) {
+                val stored = HashMap<Long, List<String?>>(threads.size)
+                db.query("cached_threads", CACHED_THREAD_COLUMNS, null, null, null, null, null).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        stored[cursor.getLong(0)] = CACHED_THREAD_COLUMNS.indices.map { index ->
+                            if (cursor.isNull(index)) null else cursor.getString(index)
+                        }
                     }
+                }
+
+                for (thread in threads) {
+                    val values = cachedThreadValues(thread)
+                    val signature = CACHED_THREAD_COLUMNS.map { values.getAsString(it) }
+                    if (stored[thread.threadId] == signature) continue
                     db.insertWithOnConflict(
                         "cached_threads",
                         null,
-                        cv,
+                        values,
                         SQLiteDatabase.CONFLICT_REPLACE
                     )
                 }
@@ -1462,6 +1512,43 @@ class RameshDatabaseHelper private constructor(context: Context) :
             }
         }
     }
+}
+
+/** Columns of `cached_threads`, in the order [cachedThreadValues] fills them. */
+private val CACHED_THREAD_COLUMNS = arrayOf(
+    "thread_id",
+    "address",
+    "contact_name",
+    "snippet",
+    "date",
+    "message_count",
+    "unread_count",
+    "is_unread_spam",
+    "has_spam",
+    "last_message_action",
+    "sub_id",
+    "new_spam_count"
+)
+
+/**
+ * The stored form of one cached conversation.
+ *
+ * Extracted so the "did anything change?" comparison and the upsert share one definition: a column
+ * added to the table can no longer be written here while staying invisible to the diff.
+ */
+fun cachedThreadValues(thread: ConversationThread): ContentValues = ContentValues().apply {
+    put("thread_id", thread.threadId)
+    put("address", thread.address)
+    put("contact_name", thread.contactName)
+    put("snippet", thread.snippet)
+    put("date", thread.date)
+    put("message_count", thread.messageCount)
+    put("unread_count", thread.unreadCount)
+    put("is_unread_spam", if (thread.isUnreadSpam) 1 else 0)
+    put("has_spam", if (thread.hasSpam) 1 else 0)
+    put("last_message_action", thread.lastMessageAction.name)
+    put("sub_id", thread.subId)
+    put("new_spam_count", thread.newSpamCount)
 }
 
 data class SpamMetaWrite(

@@ -1,9 +1,9 @@
-# Code review — 1.0.0
+# Code review — 1.0.0 / 1.0.1
 
 A full pass over the source tree (81 Kotlin files, ~22.8k lines) together with the state of the
 data layer, the receivers, the Compose UI, the build and CI. Items are ordered by risk.
 
-## Fixed in this release
+## Fixed in 1.0.0
 
 | Issue | Cause | Fix |
 | --- | --- | --- |
@@ -15,6 +15,16 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 | Release-only breakage was invisible until a tag was pushed | CI built debug only | `assembleRelease` (R8) added to CI |
 | The release signing key and its passwords were committed to a public repository | `keystore/ramesh-release.p12` + `keystore/keystore.properties` were tracked | both removed, ignored by git, and supplied to the release workflow from GitHub Actions secrets (`SIGNING_KEYSTORE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`) |
 | Play Protect blocked installs as a harmful app | releases were signed with a key that had been public since `35d9657` | key rotated on 2026-11-01; `AllowedAPKSigningKeys` updated, rotation logged in `keystore/README.md`, install/verification guidance added to the README |
+
+## Fixed in 1.0.1 (pre-release)
+
+| Issue | Cause | Fix |
+| --- | --- | --- |
+| `SmsRepository.loadThreads()` was a ~290-line function with an N+1 query: `threadHasOnlySpam()` re-queried every message of every thread whose latest message was spam | the spam-only check ran `THREAD_ID = ?` inside the per-thread loop | `readInboxRowsForThreads()` reads all candidates in one chunked query and `spamOnlyThreads()` decides from those rows; the number of provider queries per refresh no longer depends on the inbox size |
+| `replaceCachedThreads()` deleted and rewrote every row on every refresh | the cache was written as a full replacement | written as a diff (`cachedThreadValues` / `CACHED_THREAD_COLUMNS` shared by the comparison and the upsert): removed conversations are deleted, unchanged rows are skipped |
+| A failed provider read wiped the conversation cache | the empty result of a failed read was written like a real empty inbox | the loader returns the cached snapshot and leaves the cache alone; only a successful read that truly has no conversations clears it |
+| 13 `onUpgrade` branches and two `onOpen` retries swallowed exceptions | `catch (e: Exception) {}` around every schema step | one `migrate(step)` helper logs the failing step name; a half-applied migration is now visible in logcat |
+| Nothing tested the repository, the inbox maths or the database | only pure helpers had tests | `InboxSnapshotTest`, `InboxActionEvaluatorTest` and the Robolectric-backed `RameshDatabaseHelperCacheTest` cover the read path |
 
 ## Open — priority order
 
@@ -32,21 +42,11 @@ developers. Publishing through Play (even internal testing) or F-Droid is the du
 
 ### P1 — performance
 
-* `SmsRepository.loadThreads()` is ~290 lines and contains an N+1 query: `threadHasOnlySpam()`
-  re-queries every message of a thread whose latest message is spam. Replacing it with one grouped
-  query over `spam_message_meta` (or a `spam_only` column maintained on write) removes one query per
-  promotional thread.
-* `RameshDatabaseHelper.replaceCachedThreads()` rewrites every row on every refresh. Diffing against
-  the previous snapshot, or dropping the cache in favour of the provider + verdict table, would cut
-  writes on large inboxes.
 * `resolveContactName()` is not `suspend` and runs without `Dispatchers.IO`, yet `ComposeScreen`
   calls it from the main thread while the user types a recipient.
 
 ### P1 — robustness
 
-* All 13 branches of `RameshDatabaseHelper.onUpgrade` swallow exceptions, and `onOpen` retries an
-  `ALTER TABLE` on every open. A failed migration currently leaves a half-built schema with no
-  signal.
 * `SmsSendTracker` leaks an entry when the radio never acknowledges (20 s timeout); clean it up in a
   `finally`.
 * `deleteThreads()` drops the thread record even when the message delete failed (`smsOk` is computed
@@ -55,8 +55,8 @@ developers. Publishing through Play (even internal testing) or F-Droid is the du
 
 ### P2 — quality
 
-* No automated test covers the repository, the database, the receivers or the view models; the CI
-  job runs unit tests only and does not run `androidTest`.
+* The inbox read path and the database cache are covered now, but the receivers, the view models
+  and the Compose UI still have no automated tests, and the CI job does not run `androidTest`.
 * Polling-style duplication: `sms:/smsto:` parsing exists twice (`MainActivity` and
   `HeadlessSmsSendService`, 11 duplicated blocks); `TabDialogs` / `TabEditorDialogs` keep two
   parallel copies of the same dialog.
@@ -73,4 +73,4 @@ Allowlist-first filtering with the built-in Iranian presets and Persian text nor
 badge/filter/per-SIM send, delivery reports, send delay, per-conversation auto-delete, emoji
 reactions, combinable tab filters, the full appearance system (theme, accent, bubbles, fonts,
 wallpaper, message animation), lock-screen privacy, message search across all threads, per-sender
-settings, and EN/FA parity for all 345 strings.
+settings, and EN/FA parity for all 354 strings.

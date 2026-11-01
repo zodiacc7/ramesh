@@ -32,8 +32,10 @@ jobs:
             echo "::error::versionName must not include a 'v' prefix (got $VERSION)"
             exit 1
           fi
+          CODE=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts)
           TAG="${VERSION}-pre"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "App version is $VERSION (pre-release tag $TAG)"
 
@@ -97,10 +99,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
+          CODE: ${{ steps.version.outputs.code }}
         run: |
+          # Curated, bilingual notes from fastlane (keyed by versionCode), like the stable releases.
+          NOTES="--generate-notes"
+          EN_NOTES="fastlane/metadata/android/en-US/changelogs/${CODE}.txt"
+          FA_NOTES="fastlane/metadata/android/fa-IR/changelogs/${CODE}.txt"
+          if [[ -f "$EN_NOTES" ]]; then
+            BODY="$RUNNER_TEMP/release-notes.md"
+            cat "$EN_NOTES" > "$BODY"
+            if [[ -f "$FA_NOTES" ]]; then
+              printf '\n\n---\n\n## فارسی\n\n' >> "$BODY"
+              cat "$FA_NOTES" >> "$BODY"
+            fi
+            NOTES="--notes-file $BODY"
+            echo "Using release notes from $EN_NOTES (+ $FA_NOTES)"
+          fi
           gh release create "$TAG" \
             --title "$TAG" \
-            --generate-notes \
+            $NOTES \
             --prerelease \
             --latest=false \
             "dist/ramesh-${TAG}-universal.apk" \

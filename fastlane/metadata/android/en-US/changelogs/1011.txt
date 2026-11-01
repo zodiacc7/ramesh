@@ -1,0 +1,13 @@
+Ramesh 1.0.1 (build 1011) — a pre-release that makes the inbox refresh cheaper.
+
+What changed under the hood:
+- Opening the app and receiving a message no longer query the message provider once per conversation. The inbox now reads the newest messages, unread counters, SIM subscriptions and spam-only candidates in a fixed handful of batched queries.
+- The cached conversation list is updated with a diff: only the conversations that actually changed are written. Previously every row was deleted and reinserted on every refresh, including the case where nothing had changed at all.
+- A conversation that holds nothing but spam is detected in one batched query instead of one query per conversation, and it still never shows up as an empty row in the inbox or in a filter tab.
+- If the message provider is temporarily unavailable, the inbox keeps the last good snapshot instead of painting an empty list.
+- Database migration steps no longer fail silently: a failed step is written to logcat with its column name, so a damaged database can be diagnosed instead of surfacing later as a "no such column" crash.
+- The inbox assembly, the per-message filter verdicts and the conversation cache now have unit tests, including database tests that run on the JVM.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.
+
+Full feature list and install/verification instructions: github.com/zodiacc7/ramesh

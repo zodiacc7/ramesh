@@ -59,8 +59,15 @@ are normalised (`ي`→`ی`, `ك`→`ک`, ZWNJ, kashida, diacritics) before matc
 
 ## Inbox read path
 
-`SmsRepository.loadThreads()` reads threads, unread counts, latest messages and SIM ids from the
-provider, then decides an action per thread. Two rules keep that path honest:
+`SmsRepository.loadThreads()` is an orchestrator over small readers: `readThreadRows`,
+`readUnreadSnapshot`, `readLatestInboxMessages`, `readThreadSubIds` and `readInboxRowsForThreads`.
+The number of provider queries per refresh is fixed - threads, unread inbox, latest inbox, SIM ids,
+plus one chunked query for the spam-only candidates - instead of growing with the number of
+conversations. The inbox maths itself (`buildUnreadSnapshot`, `latestInboxByThread`,
+`spamOnlyThreads` in `InboxSnapshot.kt`) and the per-message verdict
+(`InboxActionEvaluator`) are plain functions over plain rows, so they are unit-tested on the JVM.
+
+Three rules keep that path honest:
 
 * **A read never writes.** Verdicts computed during the read are returned as
   `ThreadsLoadResult.pendingSpamMarks`; the view model persists them *after* publishing the list.
@@ -68,6 +75,9 @@ provider, then decides an action per thread. Two rules keep that path honest:
   the refresh that produced it.
 * **A refresh is never cancelled.** `RefreshScheduler` runs one refresh at a time and coalesces
   requests that arrive during a run into a single follow-up pass.
+* **A failed read is not an empty inbox.** When the provider cursor cannot be opened, the loader
+  returns the cached snapshot and leaves the cache alone; only a successful read that really
+  contains no conversations clears it.
 
 `spam_message_meta` is a cache of the filter verdict, not a source of truth: a blocked sender
 always wins over a stored verdict (`resolveInboxAction`), and editing a rule or a sender preference
@@ -86,8 +96,16 @@ drops the affected verdicts so the next read re-evaluates.
 user's choice. `readEnum` therefore maps legacy names (`BubbleStyle.TEXTRA` → `CLASSIC`, renamed in
 1.0.0) instead of falling back to the default.
 
-`cached_threads` is a snapshot that lets the inbox paint immediately on launch; it is replaced on
-every successful provider read.
+`cached_threads` is a snapshot that lets the inbox paint immediately on launch. On every successful
+provider read it is updated as a **diff**: conversations that disappeared are deleted, and only the
+rows whose stored values differ are written (`cachedThreadValues` / `CACHED_THREAD_COLUMNS` are
+shared by the comparison and the upsert so a new column cannot be written without being compared).
+Rewriting every row on every refresh - including the ones that had not changed at all - was pure
+I/O on the hottest path in the app.
+
+Schema steps run through `RameshDatabaseHelper.migrate(step)`, which logs a failure with the step
+name. They used to be wrapped in `catch (e: Exception) {}`: a half-applied migration stayed silent
+until a SELECT crashed with "no such column" long after the upgrade.
 
 **The "message animation" setting is a navigation transition.** It decides how a conversation (or
 any other screen) enters and leaves - slide, fade, pop or none - through
@@ -123,6 +141,9 @@ English UI.
 ## Tests
 
 `app/src/test` holds JVM unit tests for the pure logic: filter engine, OTP detector, Persian
-number/phone canonicalisation, tab matching, date formats, send tracker, inbox action resolution and
-the refresh scheduler. `TestLabScreen` (debug builds only) injects fake SMS through the real
+number/phone canonicalisation, tab matching, date formats, send tracker, inbox action resolution,
+the refresh scheduler, the inbox snapshot maths (`InboxSnapshotTest`) and the per-message verdicts
+(`InboxActionEvaluatorTest`). `RameshDatabaseHelperCacheTest` runs under Robolectric against a real
+SQLite database and asserts the cache diff with SQLite triggers, so "unchanged row was not rewritten"
+is proven by the absence of a write rather than by comparing values. `TestLabScreen` (debug builds only) injects fake SMS through the real
 receiver for manual end-to-end checks.
