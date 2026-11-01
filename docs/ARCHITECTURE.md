@@ -85,6 +85,13 @@ drops the affected verdicts so the next read re-evaluates.
 `cached_threads` is a snapshot that lets the inbox paint immediately on launch; it is replaced on
 every successful provider read.
 
+**Reactions arrive as SMS.** Clients with no reaction protocol send the reaction as text
+(`Reacted 👍 to "see you at 8"`). `SmsReactionParser` recognises the shapes (English, Persian,
+straight/typographic quotes, guillemets) and `foldSmsReactions` moves the emoji onto the closest
+earlier message whose text matches the quote, removing the extra SMS from the conversation. An
+unmatched reaction is kept as a normal message rather than dropped, and a reaction picked inside
+Ramesh is never overwritten by a network one.
+
 **Silent spam is counted, never notified.** Spam is stored read, so it can never appear in a
 thread's `unreadCount`. A spam arrival instead sets `spam_message_meta.is_new`, and
 `cached_threads.new_spam_count` carries that number into `ConversationThread.newSpamCount`. The tab
@@ -95,7 +102,7 @@ notified about is still visible, including spam-only conversations the inbox its
 ## Localisation
 
 Every user-facing string lives in `res/values/strings*.xml` with a matching
-`res/values-fa/strings*.xml`. Both languages are kept at parity (352 keys each); Persian is applied
+`res/values-fa/strings*.xml`. Both languages are kept at parity (354 keys each); Persian is applied
 by `localizedContext` on the activity base context, never by swapping the composition context.
 Message bodies are laid out with `contentAware` so Persian text reads right-to-left even in the
 English UI.

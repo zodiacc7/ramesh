@@ -1,0 +1,2 @@
+- Reactions sent as text ("Reacted 👍 to …") no longer appear as a separate message: the emoji is attached to the message it answers, and the inbox preview shows the reaction instead of the whole sentence.
+- Message animation: the row in Settings now plays the animation as you change it (tap it to replay), the styles look clearly different, and the newest bubble in a conversation plays the chosen style. Fixed the crash that could happen when messages arrived while scrolling.
