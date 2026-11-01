@@ -1,0 +1,3 @@
+- Chat background: the dark tones were so close to the theme background that every choice looked identical, and a picked photo could fail silently. Tones are now clearly distinct and the chat shows a warning in Settings when Android has revoked access to the photo.
+- Message animation: fixed the "Windows" label, translated the options, the preview now plays the animation and the chat no longer crashes with IndexOutOfBoundsException while messages arrive during scrolling.
+- Spam: messages filtered as spam still arrive without a notification, but they now count in the All and Spam tab badges until you open the conversation.
