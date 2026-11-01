@@ -1,0 +1,13 @@
+Ramesh 1.0.0 — the first stable release.
+
+This build is the same code that was tested as the 1.1.0 betas, released under the stable 1.0.0 version so that later updates always compare higher.
+
+Highlights since the first public build:
+- Sender tabs, spam filtering and silent-spam counting in the All / Spam badges.
+- Textra-style themes: chat background tones, a wallpaper photo, bubble styles and per-theme accents.
+- The message animation setting controls how conversations and other screens open and close (slide, fade, pop or none).
+- Reactions sent as text ("Reacted 👍 to …") stay attached to the message they answer instead of becoming a separate bubble.
+- Persian and English interfaces, Shamsi/Gregorian dates, dual-SIM badges, send delay, auto-delete and lock-screen privacy.
+- No ads, no trackers, no analytics. The signing key is not in the repository; every release is built and signed by CI.
+
+Upgrading from a beta: uninstall once, then install this build. Betas were signed with a different key after the rotation on 2026-11-01, so Android cannot update in place.

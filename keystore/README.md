@@ -70,9 +70,9 @@ apksigner verify --print-certs ramesh-<version>-universal.apk
 
 | Date | Release | Reason |
 | --- | --- | --- |
-| 2026-11-01 | 1.1.0-beta.18 | The original key had been committed to this public repository. Wallet-app scans flagged builds signed with it, and anyone could sign an APK Android accepts as an update of Ramesh. |
+| 2026-11-01 | 1.0.0 (first previews were 1.1.0-beta.18 and later) | The original key had been committed to this public repository. Wallet-app scans flagged builds signed with it, and anyone could sign an APK Android accepts as an update of Ramesh. |
 
-That rotation was a clean break (no lineage file): every installation older than beta.18 has to be
+That rotation was a clean break (no lineage file): every installation made before it has to be
 uninstalled once, because Android refuses an update signed with a different key. Use
 `apksigner rotate --lineage` next time if existing installs must be preserved — AGP has no lineage
 support, so the APK has to be re-signed after Gradle.
@@ -85,5 +85,5 @@ Rotation changes the app's identity:
   users must uninstall the old build first.
 * **F-Droid / Play**: a new key needs new `AllowedAPKSigningKeys`; Play requires Play App Signing.
 
-The current key was committed to this public repository up to version 1.1.0-beta.16, which means it
-must be treated as **publicly known** and should be rotated before any store distribution.
+The pre-release key was committed to this public repository, which means it must be treated as
+**publicly known**. It is retired; `1.0.0` and every later build use the key described above.
