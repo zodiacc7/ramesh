@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
 /**
- * A chat bubble with a small pointed tail in the bottom corner, like Textra's
- * default "speech bubble" style.
+ * A chat bubble with a small pointed tail in the bottom corner - the default
+ * "speech bubble" look.
  *
  * The bubble body stops [tail] short of the bottom so the tail can be drawn
  * inside the layout bounds (nothing is clipped), which is why callers add the
@@ -96,7 +96,7 @@ fun chatBubbleShape(outgoing: Boolean, style: BubbleStyle, tail: Boolean): Shape
     }
     val corner = style.cornerDp.dp
     // Pill bubbles keep identical corners everywhere; the rest get the classic
-    // small "tail side" corner used by Textra/WhatsApp.
+    // small "tail side" corner used by other messengers.
     if (style == BubbleStyle.PILL) return RoundedCornerShape(corner)
     val small = 4.dp
     return if (outgoing) {

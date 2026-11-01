@@ -173,7 +173,7 @@ class NotificationHelper private constructor(
 
         applyLockScreenPrivacy(builder, displayName, channelId, contentPendingIntent)
 
-        // Like Textra: a one-tap "Copy 123456" action when the SMS is a login code.
+        // A one-tap "Copy 123456" action when the SMS is a login code.
         if (AppearanceStore.isOtpCopyEnabled(context)) {
             OtpDetector.findCode(body)?.let { code ->
                 builder.addAction(buildCopyCodeAction(threadId, code))

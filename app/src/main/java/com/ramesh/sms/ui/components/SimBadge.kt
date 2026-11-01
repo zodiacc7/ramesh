@@ -35,7 +35,7 @@ fun SimBadge(
     tint: Color? = null
 ) {
     val text = if (compact) "$slotNumber" else stringResource(R.string.comp_sim_label, slotNumber)
-    // Bubbles can use custom Textra-style colours, so they pass their own tint.
+    // Bubbles can use custom colours, so they pass their own tint.
     val contentColor = tint?.copy(alpha = 0.9f) ?: if (isSent) {
         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
     } else {
