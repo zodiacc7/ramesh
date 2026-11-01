@@ -36,6 +36,27 @@ fun threadMatchesTab(thread: ConversationThread, tab: SenderTab): Boolean {
     return true
 }
 
+/**
+ * Threads whose messages the tab badge counts.
+ *
+ * The badge must include spam: it is filtered silently, without a notification, so the count is
+ * the only signal that something arrived. Unlike [visibleThreadsForTab] this keeps spam-only
+ * conversations in the "All" tab, which is exactly where the user expects to see the number.
+ */
+fun countableThreadsForTab(
+    threads: List<ConversationThread>,
+    tab: SenderTab?
+): List<ConversationThread> {
+    return threads.filter { thread ->
+        if (thread.messageCount <= 0) return@filter false
+        tab == null || threadMatchesTab(thread, tab)
+    }
+}
+
+/** Unread messages plus spam arrivals nobody has looked at yet, for a tab badge. */
+fun badgeCountForTab(threads: List<ConversationThread>, tab: SenderTab?): Int =
+    countableThreadsForTab(threads, tab).sumOf { it.unreadCount + it.newSpamCount }
+
 /** Threads the inbox would actually show for [tab]; a null tab means the "All" pseudo tab. */
 fun visibleThreadsForTab(
     threads: List<ConversationThread>,

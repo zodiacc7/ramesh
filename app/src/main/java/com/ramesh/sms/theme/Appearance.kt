@@ -53,7 +53,7 @@ enum class BubbleStyle(val label: String, val cornerDp: Float, val tailDp: Float
 /** Enter/exit animation used for message bubbles. */
 enum class MessageAnimation(val label: String) {
     FADE("Fade"),
-    SLIDE("Windows"),
+    SLIDE("Slide"),
     POP("Pop"),
     NONE("None")
 }
@@ -243,14 +243,19 @@ enum class BubbleTone(
     CHARCOAL("Charcoal", Color(0xFF2C3134), Color(0xFFF0F2F4), Color(0xFF3B4145), Color(0xFFFFFFFF))
 }
 
+/**
+ * Chat wallpaper tones. The dark values used to sit within a few points of the dark theme
+ * background (#111111, #0B1720, #0A1811, …), so every option looked identical. They are now spaced
+ * far enough apart to be visible on an OLED screen while still keeping bubbles readable.
+ */
 enum class ChatBackdrop(val label: String, val light: Color?, val dark: Color?) {
     DEFAULT("Default", null, null),
-    PAPER("Paper", Color(0xFFF6F3EE), Color(0xFF111111)),
-    SKY("Sky", Color(0xFFE7F1FA), Color(0xFF0B1720)),
-    MINT("Mint", Color(0xFFE5F3EA), Color(0xFF0A1811)),
-    LAVENDER("Lavender", Color(0xFFF0EBFA), Color(0xFF151021)),
-    SAND("Sand", Color(0xFFF5EDE1), Color(0xFF1A1611)),
-    CHARCOAL("Charcoal", Color(0xFFE4E7EA), Color(0xFF080A0B))
+    PAPER("Paper", Color(0xFFF2E9DB), Color(0xFF2A2118)),
+    SKY("Sky", Color(0xFFD9E9F7), Color(0xFF10293D)),
+    MINT("Mint", Color(0xFFD8EEE1), Color(0xFF10301F)),
+    LAVENDER("Lavender", Color(0xFFE9E1F7), Color(0xFF241A3D)),
+    SAND("Sand", Color(0xFFF3E3C8), Color(0xFF322618)),
+    CHARCOAL("Charcoal", Color(0xFFDDE1E6), Color(0xFF14181C))
 }
 
 /**

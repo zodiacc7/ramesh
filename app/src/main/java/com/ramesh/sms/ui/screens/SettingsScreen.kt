@@ -1,12 +1,16 @@
 package com.ramesh.sms.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,8 +26,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -38,6 +42,7 @@ import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Tab
 import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,8 +57,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,10 +71,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import android.app.Activity
 import com.ramesh.sms.R
-import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.util.AppLanguage
+import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.util.LockScreenPrivacy
 import com.ramesh.sms.engine.NotificationHelper
 import com.ramesh.sms.theme.AccentColor
@@ -79,12 +85,15 @@ import com.ramesh.sms.theme.ChatBackdrop
 import com.ramesh.sms.theme.ChatFontFamily
 import com.ramesh.sms.theme.ChatFontSize
 import com.ramesh.sms.theme.MessageAnimation
-import com.ramesh.sms.theme.ThemeMode
 import com.ramesh.sms.theme.SquircleCardShape
+import com.ramesh.sms.theme.ThemeMode
+import com.ramesh.sms.theme.backdropColorOrNull
 import com.ramesh.sms.theme.bubbleBackground
+import com.ramesh.sms.theme.bubbleContent
 import com.ramesh.sms.theme.bubbleContentBottomPadding
 import com.ramesh.sms.theme.chatBubbleShape
-import com.ramesh.sms.theme.bubbleContent
+import com.ramesh.sms.theme.messageEnterTransition
+import com.ramesh.sms.theme.messageExitTransition
 import com.ramesh.sms.ui.components.AccentSwatchPicker
 import com.ramesh.sms.ui.components.ChatDateHeader
 import com.ramesh.sms.ui.components.SettingsActionRow
@@ -94,9 +103,11 @@ import com.ramesh.sms.ui.components.SettingsGroup
 import com.ramesh.sms.ui.components.SettingsRowDivider
 import com.ramesh.sms.ui.components.SettingsSectionHeader
 import com.ramesh.sms.ui.components.SettingsSliderRow
-import com.ramesh.sms.ui.components.autoDeleteLimitForProgress
-import com.ramesh.sms.ui.components.progressForAutoDeleteLimit
 import com.ramesh.sms.ui.components.SettingsSwitchRow
+import com.ramesh.sms.ui.components.autoDeleteLimitForProgress
+import com.ramesh.sms.ui.components.hasPersistedReadAccess
+import com.ramesh.sms.ui.components.persistWallpaperAccess
+import com.ramesh.sms.ui.components.progressForAutoDeleteLimit
 import com.ramesh.sms.ui.viewmodel.ConversationsViewModel
 import kotlin.math.roundToInt
 
@@ -172,20 +183,36 @@ fun SettingsScreen(
         AppearanceStore.update(context, transform)
     }
 
+    // Remembers that the last picked wallpaper could not be granted persistent access, so the row
+    // can warn instead of pretending everything is fine until the next reboot.
+    var wallpaperNeedsNewPick by remember { mutableStateOf(false) }
+
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {
-                // Some providers do not grant persistable access; the URI still works
-                // for this session.
+            val persisted = persistWallpaperAccess(context, uri)
+            wallpaperNeedsNewPick = !persisted
+            if (!persisted) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.settings_wallpaper_needs_pick),
+                    Toast.LENGTH_LONG
+                ).show()
             }
             update { it.copy(wallpaperUri = uri.toString()) }
+        }
+    }
+
+    // A stored wallpaper whose grant was lost (app data cleared, provider removed) cannot be
+    // decoded any more; surface that instead of showing an empty chat background.
+    LaunchedEffect(look.wallpaperUri) {
+        val stored = look.wallpaperUri
+        wallpaperNeedsNewPick = if (stored.isNullOrBlank()) {
+            false
+        } else {
+            val parsed = runCatching { Uri.parse(stored) }.getOrNull()
+            parsed == null || !hasPersistedReadAccess(context, parsed)
         }
     }
 
@@ -368,6 +395,16 @@ fun SettingsScreen(
                         icon = Icons.Default.Wallpaper,
                         onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
                     )
+                    if (look.wallpaperUri != null && wallpaperNeedsNewPick) {
+                        // The file is still remembered but no longer readable, so the chat shows a
+                        // plain background. Say it out loud instead of leaving the row silent.
+                        SettingsActionRow(
+                            title = stringResource(R.string.settings_wallpaper_needs_pick),
+                            subtitle = stringResource(R.string.settings_wallpaper_needs_pick_sub),
+                            icon = Icons.Default.Warning,
+                            onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
+                        )
+                    }
                     if (look.wallpaperUri != null) {
                         SettingsActionRow(
                             title = stringResource(R.string.settings_remove_wallpaper),
@@ -467,7 +504,12 @@ fun SettingsScreen(
                     SettingsChoiceRow(
                         title = stringResource(R.string.settings_message_animation),
                         subtitle = stringResource(R.string.settings_message_animation_sub),
-                        options = MessageAnimation.entries.map { it.label },
+                        options = listOf(
+                            stringResource(R.string.settings_animation_fade),
+                            stringResource(R.string.settings_animation_slide),
+                            stringResource(R.string.settings_animation_pop),
+                            stringResource(R.string.settings_animation_none)
+                        ),
                         selectedIndex = look.messageAnimation.ordinal,
                         onSelect = { index ->
                             update { it.copy(messageAnimation = MessageAnimation.entries[index]) }
@@ -776,14 +818,19 @@ fun SettingsScreen(
 
 @Composable
 private fun BubblePreviewCard(look: Appearance) {
+    // Replay the chosen animation whenever the style or the backdrop changes, so the picker shows a
+    // result instead of asking the user to send themselves an SMS to see it.
+    var replay by remember { mutableIntStateOf(0) }
+    LaunchedEffect(look.messageAnimation, look.backdrop) { replay++ }
+    val previewBackground = look.backdrop.backdropColorOrNull()
+        ?: MaterialTheme.colorScheme.surfaceContainerLow
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         shape = SquircleCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
+        colors = CardDefaults.cardColors(containerColor = previewBackground),
         border = BorderStroke(
             0.5.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
@@ -791,60 +838,84 @@ private fun BubblePreviewCard(look: Appearance) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             ChatDateHeader(text = stringResource(R.string.settings_today))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
-                    color = look.receivedTone.bubbleBackground(false),
-                    border = BorderStroke(
-                        0.5.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_preview_in),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = look.receivedTone.bubbleContent(false),
-                        modifier = Modifier
-                            .widthIn(max = 240.dp)
-                            .padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = 9.dp,
-                                bottom = 9.dp + bubbleContentBottomPadding(
-                                    look.bubbleStyle,
-                                    look.bubbleTail
+            PreviewAnimatedSlot(replay, look) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = chatBubbleShape(false, look.bubbleStyle, look.bubbleTail),
+                        color = look.receivedTone.bubbleBackground(false),
+                        border = BorderStroke(
+                            0.5.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_preview_in),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = look.receivedTone.bubbleContent(false),
+                            modifier = Modifier
+                                .widthIn(max = 240.dp)
+                                .padding(
+                                    start = 12.dp,
+                                    end = 12.dp,
+                                    top = 9.dp,
+                                    bottom = 9.dp + bubbleContentBottomPadding(
+                                        look.bubbleStyle,
+                                        look.bubbleTail
+                                    )
                                 )
-                            )
-                    )
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Surface(
-                    shape = chatBubbleShape(true, look.bubbleStyle, look.bubbleTail),
-                    color = look.sentTone.bubbleBackground(true)
+            PreviewAnimatedSlot(replay, look) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = stringResource(R.string.settings_preview_out),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = look.sentTone.bubbleContent(true),
-                        modifier = Modifier
-                            .widthIn(max = 240.dp)
-                            .padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = 9.dp,
-                                bottom = 9.dp + bubbleContentBottomPadding(
-                                    look.bubbleStyle,
-                                    look.bubbleTail
+                    Surface(
+                        shape = chatBubbleShape(true, look.bubbleStyle, look.bubbleTail),
+                        color = look.sentTone.bubbleBackground(true)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_preview_out),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = look.sentTone.bubbleContent(true),
+                            modifier = Modifier
+                                .widthIn(max = 240.dp)
+                                .padding(
+                                    start = 12.dp,
+                                    end = 12.dp,
+                                    top = 9.dp,
+                                    bottom = 9.dp + bubbleContentBottomPadding(
+                                        look.bubbleStyle,
+                                        look.bubbleTail
+                                    )
                                 )
-                            )
-                    )
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * Plays the selected message animation inside the settings preview.
+ *
+ * The chat only animates messages younger than 15 seconds, so without this the picker looked like
+ * it did nothing until the next SMS arrived.
+ */
+@Composable
+private fun PreviewAnimatedSlot(replay: Int, look: Appearance, content: @Composable () -> Unit) {
+    val state = remember(replay) {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+    AnimatedVisibility(
+        visibleState = state,
+        enter = messageEnterTransition(look.messageAnimation),
+        exit = messageExitTransition(look.messageAnimation)
+    ) {
+        content()
     }
 }

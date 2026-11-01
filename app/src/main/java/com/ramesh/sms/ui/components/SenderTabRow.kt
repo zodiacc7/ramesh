@@ -52,6 +52,7 @@ import com.ramesh.sms.R
 import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.model.SenderTab
 import com.ramesh.sms.data.util.threadMatchesTab
+import com.ramesh.sms.data.util.badgeCountForTab
 import com.ramesh.sms.data.util.visibleThreadsForTab
 import com.ramesh.sms.theme.PillShape
 import kotlinx.coroutines.launch
@@ -141,7 +142,10 @@ fun SenderTabRow(
             // unread it falls back to the muted conversation count, so the two can never be
             // confused with each other.
             val tabThreads = visibleThreadsForTab(threads, if (isAll) null else tab)
-            val unreadCount = tabThreads.sumOf { it.unreadCount }
+            // Unread messages *and* spam that arrived silently. Spam is stored read and never
+            // notifies, so without the second term a spam-only arrival would leave the badge at
+            // zero and the user would never know it happened.
+            val unreadCount = badgeCountForTab(threads, if (isAll) null else tab)
             val hasUnread = unreadCount > 0
             val count = if (hasUnread) unreadCount else tabThreads.size
             val badgeColor = when {

@@ -188,8 +188,8 @@ class ConversationsViewModel(
     fun clearUnreadForThread(threadId: Long) {
         val current = _uiState.value
         val updatedThreads = current.threads.map { thread ->
-            if (thread.threadId == threadId && (thread.unreadCount > 0 || thread.isUnreadSpam)) {
-                thread.copy(unreadCount = 0, isUnreadSpam = false)
+            if (thread.threadId == threadId && (thread.unreadCount > 0 || thread.isUnreadSpam || thread.newSpamCount > 0)) {
+                thread.copy(unreadCount = 0, isUnreadSpam = false, newSpamCount = 0)
             } else {
                 thread
             }
@@ -198,8 +198,8 @@ class ConversationsViewModel(
             _uiState.value = current.copy(
                 threads = updatedThreads,
                 filteredThreads = current.filteredThreads.map { thread ->
-                    if (thread.threadId == threadId && (thread.unreadCount > 0 || thread.isUnreadSpam)) {
-                        thread.copy(unreadCount = 0, isUnreadSpam = false)
+                    if (thread.threadId == threadId && (thread.unreadCount > 0 || thread.isUnreadSpam || thread.newSpamCount > 0)) {
+                        thread.copy(unreadCount = 0, isUnreadSpam = false, newSpamCount = 0)
                     } else {
                         thread
                     }
@@ -210,6 +210,11 @@ class ConversationsViewModel(
             repository.markThreadRead(threadId)
             if (updatedThreads != current.threads) {
                 repository.saveCachedThreads(updatedThreads)
+            }
+            // Opening the conversation clears its silent spam arrivals from the tab badges.
+            val address = current.threads.firstOrNull { it.threadId == threadId }?.address
+            if (!address.isNullOrBlank()) {
+                repository.markNewSpamSeen(address)
             }
         }
     }
