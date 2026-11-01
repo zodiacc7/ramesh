@@ -62,30 +62,55 @@ object SmsReactionParser {
         if (!hasReactionWord) return null
 
         val quote = QUOTED.find(cleaned)
-        // The emoji is the first run of emoji code points in the message. Scanning the whole message
-        // (and not only the text around the quote) tolerates word order differences between clients,
-        // while insisting on a real emoji keeps a sentence such as "I reacted - sorry" from being
+        // The emoji is the first emoji run in the message. Scanning the whole message (and not only
+        // the text around the quote) tolerates word order differences between clients, while
+        // insisting on a real emoji keeps a sentence such as "I reacted - sorry" from being
         // swallowed as a reaction.
         val emoji = cleaned
             .split(Regex("\\s+"))
-            .firstNotNullOfOrNull { token -> EMOJI_RUN.find(token)?.value }
+            .firstNotNullOfOrNull { token -> emojiRun(token) }
             ?: return null
 
         val quoted = quote?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
         return SmsReaction(emoji = emoji, quoted = quoted)
     }
 
-    /**
-     * One emoji "atom": an astral code point (a surrogate pair, which is how 👍 is stored in UTF-16)
-     * or one of the BMP symbols used for emoji. Written as UTF-16 ranges on purpose - a plain
-     * `ch.code in 0x1F000..0x1FAFF` check never matches, because such an emoji is two chars.
-     */
-    private const val ATOM =
-        "(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF\u2B00-\u2BFF" +
-            "\u2190-\u21FF\u2900-\u297F\u2764\uFE30-\uFE4F])"
+    /** Leading emoji of [token], or null when it does not contain one. */
+    private fun emojiRun(token: String): String? {
+        val run = StringBuilder()
+        var index = 0
+        while (index < token.length) {
+            val codePoint = token.codePointAt(index)
+            when {
+                isEmojiCodePoint(codePoint) -> run.appendCodePoint(codePoint)
+                // Joiners, variation selectors and skin tones only continue a run that already
+                // started; on their own they are not a reaction.
+                run.isNotEmpty() && (codePoint == 0xFE0F || codePoint == 0xFE0E || codePoint == 0x200D) -> Unit
+                run.isNotEmpty() -> return run.toString()
+                else -> Unit
+            }
+            index += Character.charCount(codePoint)
+        }
+        return run.toString().ifEmpty { null }
+    }
 
-    /** A run of emoji atoms plus the joiners, variation selectors and skin tones between them. */
-    private val EMOJI_RUN = Regex("$ATOM(?:[\uFE0E\uFE0F\u200D]|$ATOM)*")
+    /**
+     * True for a code point that renders as an emoji.
+     *
+     * Works on whole code points on purpose: 👍 is U+1F44D, which is two UTF-16 chars in Kotlin, so
+     * a per-`Char` range test can never recognise it - the reason every reaction parsed as null.
+     */
+    private fun isEmojiCodePoint(codePoint: Int): Boolean {
+        val type = Character.getType(codePoint)
+        return codePoint in 0x1F000..0x1FAFF ||
+            codePoint in 0x2600..0x27BF ||
+            codePoint in 0x2B00..0x2BFF ||
+            codePoint in 0x2190..0x21FF ||
+            codePoint in 0x2900..0x297F ||
+            codePoint == 0x2764 ||
+            codePoint in 0x1F3FB..0x1F3FF ||
+            type == Character.OTHER_SYMBOL.toInt()
+    }
 }
 
 /**
