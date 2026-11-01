@@ -1,0 +1,2 @@
+- Fix: new SMS now appears in the conversation list immediately without restarting the app (broadcast-based inbox reload).
+- Fix: swipe-to-delete and undo-after-delete confirmed working on beta.14.

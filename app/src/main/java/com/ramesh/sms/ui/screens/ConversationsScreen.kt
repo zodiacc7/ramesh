@@ -1,6 +1,8 @@
 package com.ramesh.sms.ui.screens
 
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.widget.Toast
@@ -8,6 +10,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.runtime.DisposableEffect
+import com.ramesh.sms.receiver.SmsReceiver
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState as animateFloat
 import androidx.compose.animation.core.spring
@@ -183,6 +187,23 @@ fun ConversationsScreen(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.onInboxResumed()
+    }
+
+    // Listen for NEW_SMS_RECEIVED broadcast from SmsReceiver so the inbox reloads
+    // immediately when a new SMS arrives, without requiring a ContentObserver.
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == SmsReceiver.ACTION_NEW_SMS_RECEIVED) {
+                    viewModel.loadThreads(force = true)
+                }
+            }
+        }
+        val filter = IntentFilter(SmsReceiver.ACTION_NEW_SMS_RECEIVED)
+        LocalContext.current.registerReceiver(receiver, filter)
+        onDispose {
+            LocalContext.current.unregisterReceiver(receiver)
+        }
     }
 
     val openChat: (ChatNav) -> Unit = { nav ->
