@@ -3,7 +3,6 @@ package com.ramesh.sms
 import com.ramesh.sms.ui.viewmodel.RefreshScheduler
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -23,7 +22,7 @@ class RefreshSchedulerTest {
     @Test
     fun runsTheTaskImmediately() = runTest {
         var runs = 0
-        val scheduler = RefreshScheduler(StandardTestDispatcher(testScheduler)) { runs++ }
+        val scheduler = RefreshScheduler(this) { runs++ }
 
         scheduler.request()
         advanceUntilIdle()
@@ -36,7 +35,7 @@ class RefreshSchedulerTest {
     fun aRequestDuringARunIsServedByASecondRun() = runTest {
         var runs = 0
         val gate = CompletableDeferred<Unit>()
-        val scheduler = RefreshScheduler(StandardTestDispatcher(testScheduler)) {
+        val scheduler = RefreshScheduler(this) {
             runs++
             if (runs == 1) gate.await()
         }
@@ -58,7 +57,7 @@ class RefreshSchedulerTest {
     fun theRunningTaskIsNeverCancelled() = runTest {
         var completedRuns = 0
         val gate = CompletableDeferred<Unit>()
-        val scheduler = RefreshScheduler(StandardTestDispatcher(testScheduler)) {
+        val scheduler = RefreshScheduler(this) {
             if (completedRuns == 0) gate.await()
             completedRuns++
         }
@@ -79,7 +78,7 @@ class RefreshSchedulerTest {
     @Test
     fun aFailingTaskDoesNotStopLaterRuns() = runTest {
         var attempts = 0
-        val scheduler = RefreshScheduler(StandardTestDispatcher(testScheduler)) {
+        val scheduler = RefreshScheduler(this) {
             attempts++
             if (attempts == 1) error("boom")
         }
@@ -95,7 +94,7 @@ class RefreshSchedulerTest {
     @Test
     fun multipleRequestsAfterIdleRunOnce() = runTest {
         var runs = 0
-        val scheduler = RefreshScheduler(StandardTestDispatcher(testScheduler)) { runs++ }
+        val scheduler = RefreshScheduler(this) { runs++ }
 
         scheduler.request()
         scheduler.request()
