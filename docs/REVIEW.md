@@ -1,4 +1,4 @@
-# Code review — 1.1.0-beta.16
+# Code review — 1.0.0
 
 A full pass over the source tree (81 Kotlin files, ~22.8k lines) together with the state of the
 data layer, the receivers, the Compose UI, the build and CI. Items are ordered by risk.
@@ -20,11 +20,12 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 
 ### P1 — the leaked key still exists in history
 
-The old key is retired and `1.1.0-beta.18` is signed with a fresh one, but the old material is still
-in the git history (from `35d9657` to `1.1.0-beta.16`). Anyone can sign a build with it; such a build
+The old key is retired and `1.0.0` is signed with a fresh one, but the old material is still in the
+git history (from `35d9657` to the pre-release builds of 2026-11-01). Anyone can sign a build with it; such a build
 just cannot claim to be ours any more, because the current certificate
 (`C1:7B:EA:…:A1:AC`) is published in `keystore/README.md` and in the README install notes. Optional
-cleanup: mark the pre-rotation releases as outdated on GitHub, or delete them.
+cleanup: the pre-rotation releases were deleted from GitHub when `1.0.0` was published, so only the
+git history keeps the old material.
 
 Distribution outside Play Store remains the reason Play Protect still warns about unknown
 developers. Publishing through Play (even internal testing) or F-Droid is the durable fix.

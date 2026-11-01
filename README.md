@@ -135,11 +135,11 @@ blocked"*. These are reputation verdicts, not a statement about the code. What t
   for any app outside Play and fades as an app accumulates installs.
 * **"Harmful app blocked"**: install over ADB (`adb install -r ramesh-<version>-universal.apk`),
   which bypasses the Play Protect dialog, and report the false positive from the Play Store
-  (profile → Play Protect → help) with the hash and signer above. Builds up to `1.1.0-beta.17` were
-  signed with a key that had been published in this repository by mistake and are flagged for that
-  reason; from **`1.1.0-beta.18`** every release uses a freshly generated key.
-* **Upgrading from beta.17 or older**: the key changed, so Android cannot update in place — uninstall
-  once, then install the new build. `allowBackup="true"` normally restores Ramesh's settings.
+  (profile → Play Protect → help) with the hash and signer above. The pre-release builds that were
+  published before `1.0.0` used a key that had been published in this repository by mistake and are
+  flagged for that reason; **`1.0.0` and everything after it** use a freshly generated key.
+* **Upgrading from a pre-release build**: the key changed, so Android cannot update in place —
+  uninstall once, then install `1.0.0`. `allowBackup="true"` normally restores Ramesh's settings.
 
 **Development builds.** Every push to `main` publishes an unsigned debug APK as the
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) pre-release. It uses
@@ -330,11 +330,11 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
   بیرون از Play طبیعی است و با زیادشدن نصب‌ها کم‌رنگ می‌شود.
 * **«برنامهٔ مضر بلاک شد»**: با ADB نصب کنید (`adb install -r ramesh-<version>-universal.apk`) که
   دیالوگ Play Protect را دور می‌زند، و مثبت‌کاذب را از Play Store (پروفایل → Play Protect → help)
-  همراه هش و اثر انگشت بالا گزارش کنید. نسخه‌های تا `1.1.0-beta.17` با کلیدی امضا شده‌اند که
-  اشتباهاً در مخزن عمومی منتشر شده بود و به همین دلیل پرچم می‌خورند؛ از **`1.1.0-beta.18`** هر نسخه
-  با کلید تازه‌ساخته امضا می‌شود.
-* **ارتقا از beta.17 یا قدیم‌تر**: کلید عوض شده، پس اندروید نمی‌تواند درجا آپدیت کند — یک‌بار
-  برنامه را حذف و نسخهٔ تازه را نصب کنید. `allowBackup="true"` معمولاً تنظیمات رامش را برمی‌گرداند.
+  همراه هش و اثر انگشت بالا گزارش کنید. نسخه‌های پیش‌انتشار پیش از `1.0.0` با کلیدی امضا شده‌اند که
+  اشتباهاً در مخزن عمومی منتشر شده بود و به همین دلیل پرچم می‌خورند؛ **`1.0.0` و نسخه‌های بعد از آن**
+  با کلید تازه‌ساخته امضا می‌شوند.
+* **ارتقا از نسخه‌های پیش‌انتشار**: کلید عوض شده، پس اندروید نمی‌تواند درجا آپدیت کند — یک‌بار
+  برنامه را حذف و نسخهٔ `1.0.0` را نصب کنید. `allowBackup="true"` معمولاً تنظیمات رامش را برمی‌گرداند.
 
 **نسخه‌های آزمایشی.** با هر push روی `main` یک APK دیباگِ امضانشده در پیش‌انتشار
 [`debug-latest`](https://github.com/zodiacc7/ramesh/releases/tag/debug-latest) منتشر می‌شود. شناسهٔ
