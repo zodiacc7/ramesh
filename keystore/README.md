@@ -1,47 +1,65 @@
 # Release signing
 
-`ramesh-release.p12` is the key that identifies Ramesh to Android. Every future release must be
-signed with the same key, otherwise the phone refuses the update.
+Ramesh is signed with a single RSA 4096 key. Android refuses to install a release signed with a
+different key over an existing one, so **this key must be used for every future release**.
 
-| Item | Value |
+The key is **not** in this repository. It lives in GitHub Actions secrets, and
+`.github/workflows/release.yml` decodes it into the runner before building.
+
+## Where the key material lives
+
+| Secret | Contents |
 | --- | --- |
-| File | `keystore/ramesh-release.p12` (PKCS#12) |
-| Alias | `ramesh` |
-| Store / key password | see `keystore.properties` |
-| Algorithm | RSA 4096, SHA-256, valid until 2054 |
-| Subject | `CN=Ramesh, O=Ramesh, C=IR` |
+| `SIGNING_KEYSTORE` | the `.p12` file, base64-encoded, no line breaks required |
+| `SIGNING_STORE_PASSWORD` | store password |
+| `SIGNING_KEY_ALIAS` | `ramesh` |
+| `SIGNING_KEY_PASSWORD` | key password |
 
-`gradle` reads `keystore/keystore.properties` automatically (see `app/build.gradle.kts`), so
-`./gradlew assembleRelease` produces a signed APK locally and in CI.
+`app/build.gradle.kts` reads those as environment variables (`SIGNING_STORE_FILE`,
+`SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`, `SIGNING_STORE_TYPE`).
+The workflow writes `SIGNING_STORE_FILE` and `SIGNING_STORE_TYPE` after decoding the secret; the
+other three come straight from secrets.
 
-## ⚠️ This key is public
+If `SIGNING_STORE_FILE` is missing the release build has **no** signing config, Gradle emits
+`app-release-unsigned.apk`, and the workflow's `Verify APK is signed` step fails on purpose.
 
-The keystore and its password are committed to a public repository, which means anyone can sign an
-APK that Android recognises as an update of Ramesh. That is fine while the app is distributed only
-through GitHub Releases by its owner, but it is **not** acceptable for Google Play, and it weakens
-the trust story for F-Droid.
+## Building a signed release locally
 
-## Move the key to GitHub secrets (recommended)
+```bash
+export SIGNING_STORE_FILE=$PWD/ramesh-release.p12   # your offline copy
+export SIGNING_STORE_TYPE=PKCS12
+export SIGNING_STORE_PASSWORD='…'
+export SIGNING_KEY_ALIAS=ramesh
+export SIGNING_KEY_PASSWORD='…'
+./gradlew assembleRelease
+"$ANDROID_HOME"/build-tools/<version>/apksigner verify --print-certs \
+    app/build/outputs/apk/release/app-release.apk
+```
 
-1. Open **Settings → Secrets and variables → Actions** in the repository.
-2. Add the base64 form of the keystore:
-   ```bash
-   base64 -w0 keystore/ramesh-release.p12
-   ```
-   as `SIGNING_KEYSTORE`, then add `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` (`ramesh`) and
-   `SIGNING_KEY_PASSWORD` with the values from `keystore.properties`.
-3. Delete the checked-in material and commit:
-   ```bash
-   git rm keystore/ramesh-release.p12 keystore/keystore.properties
-   git commit -m "Move signing key to GitHub secrets"
-   ```
-   The release workflow prefers the secret when it exists and otherwise falls back to this folder,
-   so removing the files only takes effect once the secrets are in place.
-4. Keep an offline backup of the `.p12` file. Losing it means you can never update an installed
-   copy of Ramesh.
+Never commit the `.p12` or the passwords: `keystore/*.p12`, `keystore/*.jks` and
+`keystore/keystore.properties` are listed in `.gitignore` for exactly this reason.
+
+## Backups
+
+Keep at least two offline copies of the `.p12` **and** both passwords (password manager, encrypted
+USB stick, printed paper in a safe). Losing the key means no existing installation can ever be
+updated again — every user would have to uninstall and reinstall.
+
+## Key fingerprint
+
+The APK signing certificate SHA-256 is recorded in `metadata/com.ramesh.sms.yml`
+(`AllowedAPKSigningKeys`) for F-Droid. If the key is ever rotated, update that value in the same
+commit.
 
 ## Rotating the key
 
-A new key means a new identity: existing installs cannot be updated, they have to be uninstalled
-first. If you rotate, bump `applicationId` (for example `com.ramesh.sms2`) or accept the manual
-reinstall.
+Rotation changes the app's identity:
+
+* **Android 9+**: `apksigner rotate` with a lineage file lets a new key continue an existing
+  install (`--lineage`), provided the new key is also distributed inside the APK.
+* **Android 8.0 / 8.1** (our `minSdk` is 26): APK Signature Scheme v3 is unavailable, so those
+  users must uninstall the old build first.
+* **F-Droid / Play**: a new key needs new `AllowedAPKSigningKeys`; Play requires Play App Signing.
+
+The current key was committed to this public repository up to version 1.1.0-beta.16, which means it
+must be treated as **publicly known** and should be rotated before any store distribution.

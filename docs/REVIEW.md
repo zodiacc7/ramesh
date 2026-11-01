@@ -13,16 +13,17 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 | Returning from a chat or Settings showed a stale inbox | single-activity navigation never fires `ON_RESUME`, so the only refresh path was the observers | `MainNavigation` reloads whenever `ConversationsNav` is on top |
 | `:app:compileDebugKotlin` failed on `main` (beta.15) | `ACTION_NEW_SMS_RECEIVED` was declared at file scope but referenced as `SmsReceiver.…`; `LocalContext.current` was used inside `DisposableEffect`; `Context` was not imported | constant moved into the existing companion object, context captured before the effect, import added, `registerReceiver` switched to `ContextCompat.registerReceiver(…, RECEIVER_NOT_EXPORTED)` for API 34+ |
 | Release-only breakage was invisible until a tag was pushed | CI built debug only | `assembleRelease` (R8) added to CI |
+| The release signing key and its passwords were committed to a public repository | `keystore/ramesh-release.p12` + `keystore/keystore.properties` were tracked | both removed, ignored by git, and supplied to the release workflow from GitHub Actions secrets (`SIGNING_KEYSTORE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`) |
 
 ## Open — priority order
 
-### P0 — release signing key is public
+### P0 — rotate the release signing key
 
-`keystore/ramesh-release.p12` and `keystore/keystore.properties` (with the store and key passwords)
-are committed to a public repository, so anyone can sign an APK that Android accepts as an update
-of Ramesh. `keystore/README.md` already documents the move to GitHub Secrets; it has not been done.
-While distribution stays on GitHub Releases this is a trust problem rather than an outage, but the
-key should be rotated and the files removed (Play App Signing is required for a store release).
+The key is out of the repository, but it is still in the git history (from `35d9657` up to
+`1.1.0-beta.16`), so it must be treated as **publicly known**: anyone who can read the history can
+sign an APK that Android accepts as an update of Ramesh. Removing the files was the first half; the
+second half is rotating the key, which costs a one-time reinstall on Android 8.x and requires
+updating `AllowedAPKSigningKeys` in `metadata/com.ramesh.sms.yml`. See `keystore/README.md`.
 
 ### P1 — performance
 
