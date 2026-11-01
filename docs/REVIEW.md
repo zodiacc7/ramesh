@@ -14,16 +14,20 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 | `:app:compileDebugKotlin` failed on `main` (beta.15) | `ACTION_NEW_SMS_RECEIVED` was declared at file scope but referenced as `SmsReceiver.…`; `LocalContext.current` was used inside `DisposableEffect`; `Context` was not imported | constant moved into the existing companion object, context captured before the effect, import added, `registerReceiver` switched to `ContextCompat.registerReceiver(…, RECEIVER_NOT_EXPORTED)` for API 34+ |
 | Release-only breakage was invisible until a tag was pushed | CI built debug only | `assembleRelease` (R8) added to CI |
 | The release signing key and its passwords were committed to a public repository | `keystore/ramesh-release.p12` + `keystore/keystore.properties` were tracked | both removed, ignored by git, and supplied to the release workflow from GitHub Actions secrets (`SIGNING_KEYSTORE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`) |
+| Play Protect blocked installs as a harmful app | releases were signed with a key that had been public since `35d9657` | key rotated on 2026-11-01; `AllowedAPKSigningKeys` updated, rotation logged in `keystore/README.md`, install/verification guidance added to the README |
 
 ## Open — priority order
 
-### P0 — rotate the release signing key
+### P1 — the leaked key still exists in history
 
-The key is out of the repository, but it is still in the git history (from `35d9657` up to
-`1.1.0-beta.16`), so it must be treated as **publicly known**: anyone who can read the history can
-sign an APK that Android accepts as an update of Ramesh. Removing the files was the first half; the
-second half is rotating the key, which costs a one-time reinstall on Android 8.x and requires
-updating `AllowedAPKSigningKeys` in `metadata/com.ramesh.sms.yml`. See `keystore/README.md`.
+The old key is retired and `1.1.0-beta.18` is signed with a fresh one, but the old material is still
+in the git history (from `35d9657` to `1.1.0-beta.16`). Anyone can sign a build with it; such a build
+just cannot claim to be ours any more, because the current certificate
+(`C1:7B:EA:…:A1:AC`) is published in `keystore/README.md` and in the README install notes. Optional
+cleanup: mark the pre-rotation releases as outdated on GitHub, or delete them.
+
+Distribution outside Play Store remains the reason Play Protect still warns about unknown
+developers. Publishing through Play (even internal testing) or F-Droid is the durable fix.
 
 ### P1 — performance
 
