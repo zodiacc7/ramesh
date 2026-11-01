@@ -92,7 +92,7 @@ class ConversationsViewModel(
     private val dbHelper = RameshDatabaseHelper.getInstance(application)
     private var searchJob: Job? = null
     private val pendingDeletes = mutableMapOf<Long, Job>()
-    private var loadJob: Job? = null
+    private val refreshScheduler = RefreshScheduler(viewModelScope) { refreshThreads() }
     private var defaultSmsCheckJob: Job? = null
     private var observerDebounceJob: Job? = null
 
@@ -235,63 +235,72 @@ class ConversationsViewModel(
             )
         }
 
-        if (loadJob?.isActive == true) {
-            if (silent && !force) return
-            loadJob?.cancel()
+        // Refreshes are queued, never cancelled: cancelling dropped the list the in-flight read
+        // had just built, which is how a new SMS (and a freshly applied spam verdict) stayed
+        // invisible until the app was restarted. A request that arrives mid-read is served by one
+        // follow-up pass instead.
+        if (refreshScheduler.isRunning) {
+            if (force) refreshScheduler.request()
+            return
         }
-        loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isDefaultSmsApp = repository.isDefaultSmsApp()
-            )
+        refreshScheduler.request()
+    }
 
-            val cached = try {
-                repository.getCachedThreads()
-            } catch (e: Exception) {
-                emptyList()
+    private suspend fun refreshThreads() {
+        _uiState.value = _uiState.value.copy(
+            isDefaultSmsApp = repository.isDefaultSmsApp()
+        )
+
+        val cached = try {
+            repository.getCachedThreads()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val query = _uiState.value.searchQuery.trim()
+        if (cached.isNotEmpty() && _uiState.value.threads.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                threads = cached,
+                filteredThreads = filterThreads(cached, query)
+            )
+        } else if (_uiState.value.threads.isEmpty()) {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+        }
+
+        try {
+            val loaded = repository.loadThreads()
+            val currentQuery = _uiState.value.searchQuery.trim()
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                threads = loaded.threads,
+                filteredThreads = filterThreads(loaded.threads, currentQuery),
+                error = null
+            )
+            // Persist the verdicts this read had to compute only now that the list they describe
+            // is on screen. Saving inside the read emitted `spamMetaChanged`, which bounced back
+            // into this screen and cancelled the very refresh that produced it.
+            if (loaded.pendingSpamMarks.isNotEmpty()) {
+                dbHelper.saveMessagesFilterMeta(loaded.pendingSpamMarks, notify = false)
             }
-            val query = _uiState.value.searchQuery.trim()
-            if (cached.isNotEmpty() && _uiState.value.threads.isEmpty()) {
+            if (currentQuery.length >= SEARCH_MIN_QUERY_LENGTH) {
+                val messages = repository.searchAllMessages(currentQuery)
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    threads = cached,
-                    filteredThreads = filterThreads(cached, query)
+                    matchingMessages = messages,
+                    isSearching = false
                 )
             } else {
-                val showLoading = !silent && _uiState.value.threads.isEmpty()
-                if (showLoading) {
-                    _uiState.value = _uiState.value.copy(isLoading = true)
-                }
-            }
-
-            try {
-                val threads = repository.getThreads()
-                val currentQuery = _uiState.value.searchQuery.trim()
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    threads = threads,
-                    filteredThreads = filterThreads(threads, currentQuery),
-                    error = null
-                )
-                if (currentQuery.length >= SEARCH_MIN_QUERY_LENGTH) {
-                    val messages = repository.searchAllMessages(currentQuery)
-                    _uiState.value = _uiState.value.copy(
-                        matchingMessages = messages,
-                        isSearching = false
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        matchingMessages = emptyList(),
-                        isSearching = false
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to load messages"
+                    matchingMessages = emptyList(),
+                    isSearching = false
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = e.message ?: "Failed to load messages"
+            )
         }
     }
 
@@ -335,6 +344,7 @@ class ConversationsViewModel(
 
     override fun onCleared() {
         observerDebounceJob?.cancel()
+        refreshScheduler.cancel()
         val observer = smsContentObserver
         if (observer != null) {
             try {

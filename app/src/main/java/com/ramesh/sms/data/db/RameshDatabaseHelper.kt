@@ -289,6 +289,23 @@ class RameshDatabaseHelper private constructor(context: Context) :
         rules
     }
 
+    /**
+     * Drops every cached filter verdict and tells the UI that the rules changed.
+     *
+     * Verdicts are stored per message with the rule that produced them. Once a rule is added,
+     * edited, disabled or removed they can no longer be trusted: a conversation that a deleted rule
+     * marked as spam would otherwise stay in the spam tab until the app restarted. Re-evaluating is
+     * cheap because only messages without a verdict are run through the engine again.
+     */
+    private fun onRulesMutated() {
+        try {
+            writableDatabase.delete("spam_message_meta", null, null)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not invalidate cached filter verdicts", e)
+        }
+        _rulesChanged.value = System.currentTimeMillis()
+    }
+
     suspend fun insertCustomRule(rule: FilterRule): Long = withContext(Dispatchers.IO) {
         val cv = ContentValues().apply {
             put("name", rule.name)
@@ -304,7 +321,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
             put("created_at", System.currentTimeMillis())
         }
         val id = writableDatabase.insert("filter_rules", null, cv)
-        _rulesChanged.value = System.currentTimeMillis()
+        onRulesMutated()
         id
     }
 
@@ -328,7 +345,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 cv,
                 SQLiteDatabase.CONFLICT_REPLACE
             )
-            _rulesChanged.value = System.currentTimeMillis()
+            onRulesMutated()
             rows > 0
         } else {
             val cv = ContentValues().apply {
@@ -348,7 +365,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 "id = ?",
                 arrayOf(rule.id.toString())
             )
-            _rulesChanged.value = System.currentTimeMillis()
+            onRulesMutated()
             rows > 0
         }
     }
@@ -361,11 +378,11 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 put("is_enabled", 0)
             }
             val ok = updateOrInsertPredefinedSettings(db, ruleId, flags)
-            _rulesChanged.value = System.currentTimeMillis()
+            onRulesMutated()
             ok
         } else {
             val rows = db.delete("filter_rules", "id = ?", arrayOf(ruleId.toString()))
-            _rulesChanged.value = System.currentTimeMillis()
+            onRulesMutated()
             rows > 0
         }
     }
@@ -382,7 +399,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
             }
             writableDatabase.update("filter_rules", cv, "id = ?", arrayOf(ruleId.toString()))
         }
-        _rulesChanged.value = System.currentTimeMillis()
+        onRulesMutated()
     }
 
     // --- Sender Preferences Operations ---
@@ -445,7 +462,25 @@ class RameshDatabaseHelper private constructor(context: Context) :
             cv,
             SQLiteDatabase.CONFLICT_REPLACE
         )
+        // The verdicts stored for this sender were computed with the *old* preference. Blocking a
+        // sender (or changing its tier) must win immediately, so drop them and let the next read
+        // re-evaluate. Without this a conversation keeps its stale NORMAL/SILENT verdict and
+        // never moves to the spam tab until the app restarts.
+        deleteSpamMetaForAddressLocked(pref.address)
         _prefsChanged.value = System.currentTimeMillis()
+    }
+
+    /** Blocking variant of [deleteSpamMetaForAddress], for callers already inside an IO block. */
+    private fun deleteSpamMetaForAddressLocked(address: String) {
+        if (address.isBlank()) return
+        val variants = addressLookupKeys(address)
+        if (variants.isEmpty()) return
+        val placeholders = variants.joinToString(",") { "?" }
+        try {
+            writableDatabase.delete("spam_message_meta", "address IN ($placeholders)", variants)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not drop spam verdicts for a stored sender", e)
+        }
     }
 
     suspend fun updateSenderPreferredSubId(address: String, preferredSubId: Int) = withContext(Dispatchers.IO) {
@@ -479,7 +514,17 @@ class RameshDatabaseHelper private constructor(context: Context) :
         )
     }
 
-    suspend fun saveMessagesFilterMeta(entries: List<SpamMetaWrite>) = withContext(Dispatchers.IO) {
+    /**
+     * Stores filter verdicts for a batch of messages.
+     *
+     * @param notify whether `spamMetaChanged` should fire. Reads pass `false`: the caller already
+     *   used these verdicts to build the list it is about to publish, and notifying here would
+     *   schedule a second, identical pass.
+     */
+    suspend fun saveMessagesFilterMeta(
+        entries: List<SpamMetaWrite>,
+        notify: Boolean = true
+    ) = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext
         val db = writableDatabase
         val now = System.currentTimeMillis()
@@ -506,7 +551,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
         } finally {
             db.endTransaction()
         }
-        _spamMetaChanged.value = now
+        if (notify) _spamMetaChanged.value = now
     }
 
     suspend fun getAllReactions(): Map<Long, String> = withContext(Dispatchers.IO) {
@@ -1324,6 +1369,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
     }
 
     companion object {
+        private const val TAG = "RameshDatabaseHelper"
         private const val DATABASE_NAME = "ramesh_filters.db"
         private const val DATABASE_VERSION = 6
         private const val SQLITE_IN_CHUNK_SIZE = 500

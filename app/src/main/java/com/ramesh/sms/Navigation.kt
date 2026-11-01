@@ -57,6 +57,17 @@ fun MainNavigation(
         }
     }
 
+    // Coming back from a chat or from settings has to re-read the inbox. This is a single activity,
+    // so navigating inside the app never resumes the activity and Lifecycle.ON_RESUME does not fire:
+    // a conversation marked as spam from the chat (or a message that arrived while the chat was
+    // open) would sit stale until the app was restarted.
+    val isInboxOnTop = backStack.lastOrNull() is ConversationsNav
+    LaunchedEffect(isInboxOnTop) {
+        if (isInboxOnTop) {
+            conversationsViewModel.loadThreads(silent = true, force = true)
+        }
+    }
+
     NavDisplay(
         backStack = backStack,
         // Both directions are exact mirrors: slide-in + fade-in for incoming, slide-out + fade-out

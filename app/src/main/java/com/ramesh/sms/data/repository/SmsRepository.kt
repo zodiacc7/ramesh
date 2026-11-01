@@ -25,6 +25,7 @@ import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.data.telephony.SimRepository
 import com.ramesh.sms.data.util.AppPreferences
 import com.ramesh.sms.data.util.PhoneNumberKeys
+import com.ramesh.sms.data.util.resolveInboxAction
 import com.ramesh.sms.data.util.UserPreferences
 import com.ramesh.sms.engine.FilterRulesCache
 import com.ramesh.sms.engine.IncomingSmsPolicy
@@ -106,7 +107,15 @@ class SmsRepository(
     suspend fun saveCachedThreads(threads: List<ConversationThread>) =
         dbHelper.replaceCachedThreads(threads)
 
-    suspend fun getThreads(): List<ConversationThread> = withContext(Dispatchers.IO) {
+    /**
+     * Reads the inbox from the telephony provider.
+     *
+     * Filter decisions reached for messages seen for the first time are returned as
+     * [ThreadsLoadResult.pendingSpamMarks] rather than written here. A write during the read used
+     * to emit `spamMetaChanged`, which cancelled the very reload that produced it and left the UI
+     * on the previous list.
+     */
+    suspend fun loadThreads(): ThreadsLoadResult = withContext(Dispatchers.IO) {
         val threads = mutableListOf<ConversationThread>()
         val contentResolver = context.contentResolver
 
@@ -229,53 +238,42 @@ class SmsRepository(
             val pendingSpamMarks = mutableListOf<SpamMetaWrite>()
             val evaluatedActions = mutableMapOf<Long, FilterAction>()
 
-            val needsFilterEval =
-                latestInboxMessage.values.any { it.first !in spamMetaMap } ||
-                    latestUnreadMessage.values.any { it.first !in spamMetaMap }
+            // The cached rules and sender preferences are served from memory by FilterRulesCache,
+            // so they are always available - a sender blocked a second ago must win over a stale
+            // verdict stored for this message.
+            val cache = FilterRulesCache.getInstance(dbHelper)
+            val preparedRules = cache.preparedRules()
+            val senderPrefs = cache.senderPreferences()
 
-            var preparedRules: PreparedFilterRules? = null
-            var senderPrefs = emptyMap<String, SenderPreference>()
-            if (needsFilterEval) {
-                val cache = FilterRulesCache.getInstance(dbHelper)
-                preparedRules = cache.preparedRules()
-                senderPrefs = cache.senderPreferences()
-            }
-
-            fun resolveInboxAction(msgId: Long, address: String, body: String, isContact: Boolean): FilterAction {
+            fun actionFor(msgId: Long, address: String, body: String, isContact: Boolean): FilterAction {
                 evaluatedActions[msgId]?.let { return it }
-                val meta = spamMetaMap[msgId]
-                val action = if (meta != null) {
-                    if (userPreferences.noSpamForContacts && isContact && meta.action == FilterAction.SPAM) {
-                        FilterAction.NORMAL
-                    } else {
-                        meta.action
-                    }
-                } else {
-                    val prepared = preparedRules
-                    if (prepared == null) {
-                        FilterAction.NORMAL
-                    } else {
-                        val pref = senderPrefs[dbHelper.normalizeAddress(address)]
-                        val eval = SmsFilterEngine.evaluateMessage(
-                            sender = address,
-                            body = body,
-                            prepared = prepared,
-                            senderPreference = pref,
-                            isContact = isContact,
-                            noSpamForContacts = userPreferences.noSpamForContacts
-                        )
-                        if (eval.action != FilterAction.NORMAL) {
-                            pendingSpamMarks.add(
-                                SpamMetaWrite(
-                                    messageId = msgId,
-                                    address = address,
-                                    matchedRuleName = eval.matchedRuleName,
-                                    action = eval.action
-                                )
+                val preferred = senderPrefs[dbHelper.normalizeAddress(address)]
+                val decided = resolveInboxAction(
+                    storedAction = spamMetaMap[msgId]?.action,
+                    isSenderBlocked = preferred?.isBlocked == true,
+                    isContact = isContact,
+                    noSpamForContacts = userPreferences.noSpamForContacts
+                )
+                val action = decided ?: run {
+                    val eval = SmsFilterEngine.evaluateMessage(
+                        sender = address,
+                        body = body,
+                        prepared = preparedRules,
+                        senderPreference = preferred,
+                        isContact = isContact,
+                        noSpamForContacts = userPreferences.noSpamForContacts
+                    )
+                    if (eval.action != FilterAction.NORMAL) {
+                        pendingSpamMarks.add(
+                            SpamMetaWrite(
+                                messageId = msgId,
+                                address = address,
+                                matchedRuleName = eval.matchedRuleName,
+                                action = eval.action
                             )
-                        }
-                        eval.action
+                        )
                     }
+                    eval.action
                 }
                 evaluatedActions[msgId] = action
                 return action
@@ -298,7 +296,7 @@ class SmsRepository(
                         val idIdx = spamCursor.getColumnIndexOrThrow(Telephony.Sms._ID)
                         val bodyIdx = spamCursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
                         while (spamCursor.moveToNext()) {
-                            val action = resolveInboxAction(
+                            val action = actionFor(
                                 spamCursor.getLong(idIdx),
                                 address,
                                 spamCursor.getString(bodyIdx) ?: "",
@@ -360,12 +358,12 @@ class SmsRepository(
                 val unreadCount = unreadCounts[threadId] ?: 0
                 val lastInbox = latestInboxMessage[threadId]
                 val lastMessageAction = if (lastInbox != null) {
-                    resolveInboxAction(lastInbox.first, address, lastInbox.second, isContact)
+                    actionFor(lastInbox.first, address, lastInbox.second, isContact)
                 } else {
                     FilterAction.NORMAL
                 }
                 val isUnreadSpam = unreadCount > 0 && latestUnreadMessage[threadId]?.let { latest ->
-                    resolveInboxAction(latest.first, address, latest.second, isContact) == FilterAction.SPAM
+                    actionFor(latest.first, address, latest.second, isContact) == FilterAction.SPAM
                 } == true
                 val spamOnly = lastMessageAction == FilterAction.SPAM &&
                     threadHasOnlySpam(threadId, address, isContact)
@@ -396,17 +394,17 @@ class SmsRepository(
                 )
             }
 
-            if (pendingSpamMarks.isNotEmpty()) {
-                dbHelper.saveMessagesFilterMeta(pendingSpamMarks)
-            }
             if (threadsCursorOk) {
                 dbHelper.replaceCachedThreads(threads)
             }
+            return@withContext ThreadsLoadResult(
+                threads = threads,
+                pendingSpamMarks = pendingSpamMarks.toList()
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error reading threads", e)
+            return@withContext ThreadsLoadResult(threads = threads, pendingSpamMarks = emptyList())
         }
-
-        threads
     }
 
     suspend fun getMessagesForThread(
@@ -511,7 +509,13 @@ class SmsRepository(
                     val matchedRule: String?
                     val isRevealed: Boolean
 
-                    if (meta != null) {
+                    if (senderPref?.isBlocked == true) {
+                        // Blocking a sender wins over any verdict cached for its messages, so the
+                        // chat reads as spam right away instead of after a restart.
+                        isSpam = true
+                        matchedRule = meta?.matchedRuleName ?: "Sender Blocked"
+                        isRevealed = meta?.isRevealed ?: false
+                    } else if (meta != null) {
                         isSpam = if (userPreferences.noSpamForContacts && isContact) false else meta.action == FilterAction.SPAM
                         matchedRule = meta.matchedRuleName
                         isRevealed = meta.isRevealed
@@ -566,7 +570,8 @@ class SmsRepository(
             }
 
             if (pendingSpamMarks.isNotEmpty()) {
-                dbHelper.saveMessagesFilterMeta(pendingSpamMarks)
+                // Silent: these verdicts are already reflected in the list built above.
+                dbHelper.saveMessagesFilterMeta(pendingSpamMarks, notify = false)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error reading messages for thread $threadId", e)
@@ -1129,17 +1134,9 @@ class SmsRepository(
 
             val spamMetaMap = dbHelper.getSpamMetaMapForIds(hits.map { it.messageId })
             val pendingSpamMarks = mutableListOf<SpamMetaWrite>()
-            val needsFilterEval = hits.any { hit ->
-                hit.type == Telephony.Sms.MESSAGE_TYPE_INBOX && hit.messageId !in spamMetaMap
-            }
-
-            var preparedRules: PreparedFilterRules? = null
-            var senderPrefs = emptyMap<String, SenderPreference>()
-            if (needsFilterEval) {
-                val cache = FilterRulesCache.getInstance(dbHelper)
-                preparedRules = cache.preparedRules()
-                senderPrefs = cache.senderPreferences()
-            }
+            val cache = FilterRulesCache.getInstance(dbHelper)
+            val preparedRules = cache.preparedRules()
+            val senderPrefs = cache.senderPreferences()
 
             for (hit in hits) {
                 val detail = PhoneNumberKeys.lookupValue(contactDetails, hit.address)
@@ -1147,34 +1144,31 @@ class SmsRepository(
                 val isContact = !contactName.isNullOrBlank()
 
                 val meta = spamMetaMap[hit.messageId]
-                val isSpam = if (meta != null) {
+                val pref = senderPrefs[dbHelper.normalizeAddress(hit.address)]
+                val isSpam = if (pref?.isBlocked == true) {
+                    true
+                } else if (meta != null) {
                     if (userPreferences.noSpamForContacts && isContact) false else meta.action == FilterAction.SPAM
                 } else if (hit.type == Telephony.Sms.MESSAGE_TYPE_INBOX) {
-                    val prepared = preparedRules
-                    if (prepared == null) {
-                        false
-                    } else {
-                        val pref = senderPrefs[dbHelper.normalizeAddress(hit.address)]
-                        val eval = SmsFilterEngine.evaluateMessage(
-                            sender = hit.address,
-                            body = hit.body,
-                            prepared = prepared,
-                            senderPreference = pref,
-                            isContact = isContact,
-                            noSpamForContacts = userPreferences.noSpamForContacts
-                        )
-                        if (eval.action != FilterAction.NORMAL) {
-                            pendingSpamMarks.add(
-                                SpamMetaWrite(
-                                    messageId = hit.messageId,
-                                    address = hit.address,
-                                    matchedRuleName = eval.matchedRuleName,
-                                    action = eval.action
-                                )
+                    val eval = SmsFilterEngine.evaluateMessage(
+                        sender = hit.address,
+                        body = hit.body,
+                        prepared = preparedRules,
+                        senderPreference = pref,
+                        isContact = isContact,
+                        noSpamForContacts = userPreferences.noSpamForContacts
+                    )
+                    if (eval.action != FilterAction.NORMAL) {
+                        pendingSpamMarks.add(
+                            SpamMetaWrite(
+                                messageId = hit.messageId,
+                                address = hit.address,
+                                matchedRuleName = eval.matchedRuleName,
+                                action = eval.action
                             )
-                        }
-                        eval.action == FilterAction.SPAM
+                        )
                     }
+                    eval.action == FilterAction.SPAM
                 } else {
                     false
                 }
@@ -1198,7 +1192,7 @@ class SmsRepository(
             }
 
             if (pendingSpamMarks.isNotEmpty()) {
-                dbHelper.saveMessagesFilterMeta(pendingSpamMarks)
+                dbHelper.saveMessagesFilterMeta(pendingSpamMarks, notify = false)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error searching all messages for query: $query", e)
@@ -1529,6 +1523,18 @@ class SmsRepository(
     suspend fun updateSenderPreferredSubId(address: String, preferredSubId: Int) =
         dbHelper.updateSenderPreferredSubId(address, preferredSubId)
 }
+
+/**
+ * Outcome of [SmsRepository.loadThreads].
+ *
+ * [pendingSpamMarks] holds the filter verdicts the read had to compute itself. The caller persists
+ * them *after* publishing [threads], so the write notification can never race the reload that
+ * produced it.
+ */
+data class ThreadsLoadResult(
+    val threads: List<ConversationThread>,
+    val pendingSpamMarks: List<SpamMetaWrite>
+)
 
 data class SendSmsResult(
     val sent: Boolean,
