@@ -34,6 +34,21 @@ jobs:
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
           ./gradlew testDebugUnitTest 2>&1 | tee -a build.log
 
+      # The release build is the one users install, and it runs R8 with the project's own
+      # keep rules. Building it here catches shrinker-only breakage (a class kept in debug but
+      # stripped in release) before a tag is pushed.
+      - name: Build release APK (R8)
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee -a release.log || {
+            tr -d '\r' < release.log \
+              | grep -E '^e: |^FAILURE: |What went wrong|Execution failed for task|R8|Missing class' \
+              | head -n 50 \
+              | sed 's/%/%25/g' \
+              | awk '{ printf "::error::%s\n", $0 }'
+            exit 1
+          }
+
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4

@@ -1,0 +1,4 @@
+- Fix: the inbox now always shows a new SMS without restarting the app. Refreshes are queued instead of cancelling each other, so the list a refresh just built can no longer be thrown away.
+- Fix: marking a conversation as spam moves it to the spam tab immediately, and the verdict survives returning from the chat.
+- Fix: blocking a sender now overrides verdicts cached for older messages, and editing or deleting a filter rule re-evaluates the inbox instead of keeping stale results.
+- Fix: coming back from a chat or from Settings refreshes the inbox (single-activity navigation never fires ON_RESUME).
