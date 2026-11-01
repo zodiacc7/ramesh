@@ -201,7 +201,7 @@ class RameshDatabaseHelperCacheTest {
     fun `the columns added by later migrations exist`() {
         // onOpen adds these defensively; a database that skipped a step must still answer the
         // SELECTs the inbox issues.
-        val columns = helper.readableDatabase.query("PRAGMA table_info(cached_threads)").use { cursor ->
+        val columns = helper.readableDatabase.rawQuery("PRAGMA table_info(cached_threads)", null).use { cursor ->
             val names = HashSet<String>()
             val nameIdx = cursor.getColumnIndexOrThrow("name")
             while (cursor.moveToNext()) names.add(cursor.getString(nameIdx))
