@@ -19,7 +19,15 @@ data class SmsMessage(
     val status: Int = Telephony.Sms.STATUS_NONE,
     val subId: Int = SubscriptionManager.INVALID_SUBSCRIPTION_ID,
     /** Emoji reaction attached locally to this message, if any. */
-    val reaction: String? = null
+    val reaction: String? = null,
+    /**
+     * A filtered spam message nobody has opened yet.
+     *
+     * This is the same flag the inbox badge counts (`spam_message_meta.is_new`), carried down to the
+     * message itself: without it the badge said "2" while nothing on screen showed which two
+     * messages it meant.
+     */
+    val isNewSpam: Boolean = false
 ) {
     val isInbox: Boolean get() = type == 1
     val isSent: Boolean get() = type == 2

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -60,6 +63,9 @@ import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.RameshIcons
 import kotlin.math.roundToInt
 
+/** Duration of the strip's slide, in and out. Short enough to feel attached to the tap. */
+private const val ANIMATION_MS = 150
+
 /**
  * The action strip a single tap on a bubble opens - the Textra layout.
  *
@@ -68,8 +74,10 @@ import kotlin.math.roundToInt
  * dropping below when there is no room. It is an ordinary overlay, not a `Dialog`, so nothing around
  * it is dimmed; a transparent layer behind it only exists so a tap anywhere else closes the strip.
  *
- * Order: [code chip] · Copy · React · Share · Forward · Delete · Info · Read/unread. The chip only
- * appears when the message carries a verification code, and copies the code itself.
+ * Order: [code chip] · Copy · React · Share · Forward · Delete · Info · Select. The chip only appears
+ * when the message carries a verification code, and copies the code itself. The last action is the
+ * double check from Textra's strip and it selects the message; the old read/unread toggle is gone,
+ * because that is not what that button does there.
  *
  * The strip is stateless. Delete is armed by the caller through [deleteArmed]: the first tap on the
  * bin opens it (red, filled), the second deletes.
@@ -80,7 +88,8 @@ fun MessageActionBar(
     visible: Boolean = true,
     otpCode: String?,
     canReact: Boolean,
-    markedRead: Boolean,
+    /** Which side the bubble sits on; the strip slides in from exactly there. */
+    isSent: Boolean,
     deleteArmed: Boolean,
     onCopyCode: () -> Unit,
     onCopy: () -> Unit,
@@ -89,17 +98,30 @@ fun MessageActionBar(
     onForward: () -> Unit,
     onDelete: () -> Unit,
     onInfo: () -> Unit,
-    onToggleRead: () -> Unit,
+    onSelect: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var barSize by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
-    // One animation for every bubble, sent or received: the strip fades in and out in place. Any
-    // positional entrance read differently on right-hand bubbles than on left-hand ones.
-    val fade = remember { Animatable(0f) }
+    val layoutDirection = LocalLayoutDirection.current
+
+    // A received bubble sits at the start of the chat and a sent one at the end, so the strip comes
+    // from that same side: received slides left-to-right, sent right-to-left. In a right-to-left UI
+    // the two swap with the layout, so the rule stays "from the bubble's own side" instead of a
+    // hard-coded sign.
+    val fromEnd = if (layoutDirection == LayoutDirection.Rtl) !isSent else isSent
+
+    // One animation for every bubble: a horizontal slide. Fading one and sliding the other (what
+    // this used to do) is exactly what made the two look different.
+    val slide = remember { Animatable(0f) }
     LaunchedEffect(visible) {
-        fade.animateTo(if (visible) 1f else 0f, tween(130))
+        if (visible) {
+            slide.snapTo(if (fromEnd) 1f else -1f)
+            slide.animateTo(0f, tween(ANIMATION_MS))
+        } else {
+            slide.animateTo(if (fromEnd) 1f else -1f, tween(ANIMATION_MS))
+        }
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -140,7 +162,13 @@ fun MessageActionBar(
                 .widthIn(max = 560.dp)
                 // Hidden for the single frame before its size is known, so it never flickers at the
                 // bubble's corner and then jumps above it.
-                .alpha(if (barSize == IntSize.Zero) 0f else fade.value)
+                .alpha(if (barSize == IntSize.Zero) 0f else 1f)
+                // Travel is the strip's own width, so it emerges from under the bubble instead of
+                // flying across the screen.
+                .offset {
+                    val travel = barSize.width.toFloat().coerceAtLeast(1f)
+                    IntOffset((slide.value * travel).roundToInt(), 0)
+                }
                 .onSizeChanged { barSize = it }
         ) {
             Row(
@@ -207,15 +235,11 @@ fun MessageActionBar(
                         onClick = onInfo
                     )
                     BarAction(
-                        // One glyph, always: the double check. Only the state changes, so the button
-                        // keeps its identity between taps.
+                        // Textra's double check: in its strip this is the "act on this message"
+                        // button, so it enters selection mode with this message selected.
                         icon = Icons.Default.DoneAll,
-                        label = if (markedRead) {
-                            stringResource(R.string.chat_mark_unread)
-                        } else {
-                            stringResource(R.string.chat_mark_read)
-                        },
-                        onClick = onToggleRead
+                        label = stringResource(R.string.chat_menu_select),
+                        onClick = onSelect
                     )
                 }
             }

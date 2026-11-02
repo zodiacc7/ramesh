@@ -1504,7 +1504,13 @@ private fun ConversationItem(
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.titleMedium.contentAware(),
-                    fontWeight = if (thread.unreadCount > 0 && !thread.isUnreadSpam) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    fontWeight = if (
+                        (thread.unreadCount > 0 && !thread.isUnreadSpam) || thread.newSpamCount > 0
+                    ) {
+                        FontWeight.ExtraBold
+                    } else {
+                        FontWeight.SemiBold
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -1583,10 +1589,19 @@ private fun SpamChip(newCount: Int) {
     val isDark = isSystemInDarkTheme()
     val content = if (isDark) SpamWarningOnDark else SpamWarningOnLight
     val border = if (isDark) SpamWarningBorderDark else SpamWarningBorderLight
+    // While arrivals are still unopened the chip is filled solid instead of tinted: that is the
+    // row-level answer to "the badge went up, which one is it?", and it has to be visible at a
+    // glance rather than a subtle outline.
+    val filled = newCount > 0
     Surface(
         shape = PillShape,
-        color = content.copy(alpha = if (isDark) 0.22f else 0.12f),
-        border = BorderStroke(0.5.dp, border.copy(alpha = 0.7f))
+        color = if (filled) {
+            content.copy(alpha = if (isDark) 0.85f else 0.9f)
+        } else {
+            content.copy(alpha = if (isDark) 0.22f else 0.12f)
+        },
+        contentColor = if (filled) (if (isDark) SpamWarningDark else Color.White) else content,
+        border = BorderStroke(0.5.dp, border.copy(alpha = if (filled) 0.9f else 0.7f))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1595,7 +1610,11 @@ private fun SpamChip(newCount: Int) {
             Icon(
                 imageVector = Icons.Default.Shield,
                 contentDescription = null,
-                tint = content,
+                tint = if (filled) {
+                    if (isDark) SpamWarningDark else Color.White
+                } else {
+                    content
+                },
                 modifier = Modifier.size(11.dp)
             )
             Spacer(modifier = Modifier.width(3.dp))
@@ -1606,7 +1625,11 @@ private fun SpamChip(newCount: Int) {
                     stringResource(R.string.comp_spam)
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = content,
+                color = if (filled) {
+                    if (isDark) SpamWarningDark else Color.White
+                } else {
+                    content
+                },
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
                 maxLines = 1

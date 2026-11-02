@@ -166,18 +166,23 @@ fun MessageDetailsDialog(
                         appLanguage
                     )
                 )
-                DetailRow(
-                    label = stringResource(R.string.chat_details_delivered),
-                    value = if (message.isDelivered) {
-                        SmsDateFormats.formatDateTimeWithYear(
-                            message.date,
-                            useShamsi,
-                            appLanguage
-                        )
-                    } else {
-                        stringResource(R.string.chat_details_unknown)
-                    }
-                )
+                // A received message has no delivery report of ours to show: the row only makes
+                // sense for something this phone sent, so it is omitted rather than filled with a
+                // dash.
+                if (message.isSent) {
+                    DetailRow(
+                        label = stringResource(R.string.chat_details_delivered),
+                        value = if (message.isDelivered) {
+                            SmsDateFormats.formatDateTimeWithYear(
+                                message.date,
+                                useShamsi,
+                                appLanguage
+                            )
+                        } else {
+                            stringResource(R.string.chat_details_unknown)
+                        }
+                    )
+                }
             }
         },
         confirmButton = {

@@ -227,11 +227,9 @@ class ConversationsViewModel(
             if (updatedThreads != current.threads) {
                 repository.saveCachedThreads(updatedThreads)
             }
-            // Opening the conversation clears its silent spam arrivals from the tab badges.
-            val address = current.threads.firstOrNull { it.threadId == threadId }?.address
-            if (!address.isNullOrBlank()) {
-                repository.markNewSpamSeen(address)
-            }
+            // The "new spam" flag itself is cleared by the chat, once its messages are on screen
+            // (see ChatViewModel.loadMessages): clearing it here raced the load and the fresh
+            // arrivals had already lost their NEW marks by the time they were drawn.
         }
     }
 

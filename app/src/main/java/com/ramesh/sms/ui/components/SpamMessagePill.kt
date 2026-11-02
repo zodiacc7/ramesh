@@ -149,12 +149,33 @@ fun SpamMessagePill(
                     Spacer(modifier = Modifier.width(10.dp))
 
                     Column {
-                        Text(
-                            text = stringResource(R.string.comp_spam_message_filtered),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = textColor
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.comp_spam_message_filtered),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
+                            // Which filtered message is the one the tab badge is counting: the
+                            // flag that feeds the badge is shown here, on the message itself.
+                            if (message.isNewSpam) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = PillShape,
+                                    color = textColor,
+                                    contentColor = bgColor,
+                                    modifier = Modifier.padding(top = 1.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.comp_new),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 9.5.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                         message.matchedRuleName?.let { ruleName ->
                             Surface(
                                 shape = TagShape,
