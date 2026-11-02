@@ -58,6 +58,17 @@ object SmsDateFormats {
         return formatters.getOrPut(locale) { Formats(locale) }
     }
 
+    /**
+     * Persian UI always gets Persian digits.
+     *
+     * `fa-IR` supplies the month and weekday *names* but the JDK formats its numbers with the Latin
+     * numbering system, so `MMM d` alone prints "سپتامبر 13" - a Persian name with English digits,
+     * the exact kind of mix this file is here to prevent. Converting after formatting makes the
+     * digits follow the language no matter what the platform's locale data says.
+     */
+    private fun digits(text: String, appLanguage: AppLanguage): String =
+        if (appLanguage.isPersian()) toPersianDigits(text) else text
+
     /** Jalali month names are always Persian: the calendar itself is Persian by definition. */
     private val SHAMSI_MONTH_NAMES = arrayOf(
         "فروردین",
@@ -154,11 +165,12 @@ object SmsDateFormats {
         val formats = formatsFor(appLanguage)
         val messageDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
         val currentDate = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-        return if (messageDate.year == currentDate.year) {
+        val text = if (messageDate.year == currentDate.year) {
             messageDate.format(formats.monthDay)
         } else {
             messageDate.format(formats.monthDayYear)
         }
+        return digits(text, appLanguage)
     }
 
     /** English (Latin) Jalali month names for English UI. */
@@ -245,18 +257,27 @@ object SmsDateFormats {
             val t = if (isPersian) toPersianDigits(timePart) else timePart
             "$datePart، $t"
         } else {
-            Instant.ofEpochMilli(timestamp).atZone(zone)
-                .format(formatsFor(appLanguage).yearMonthDayClock)
+            digits(
+                Instant.ofEpochMilli(timestamp).atZone(zone)
+                    .format(formatsFor(appLanguage).yearMonthDayClock),
+                appLanguage
+            )
         }
     }
 
     fun clock(timestamp: Long, appLanguage: AppLanguage = AppLanguage.SYSTEM): String =
-        Instant.ofEpochMilli(timestamp).atZone(zone).toLocalTime()
-            .format(formatsFor(appLanguage).clock)
+        digits(
+            Instant.ofEpochMilli(timestamp).atZone(zone).toLocalTime()
+                .format(formatsFor(appLanguage).clock),
+            appLanguage
+        )
 
     fun monthDayClock(timestamp: Long, appLanguage: AppLanguage = AppLanguage.SYSTEM): String =
-        Instant.ofEpochMilli(timestamp).atZone(zone)
-            .format(formatsFor(appLanguage).monthDayClock)
+        digits(
+            Instant.ofEpochMilli(timestamp).atZone(zone)
+                .format(formatsFor(appLanguage).monthDayClock),
+            appLanguage
+        )
 
     fun isSameDay(first: Long, second: Long): Boolean {
         val firstDate = Instant.ofEpochMilli(first).atZone(zone).toLocalDate()
@@ -298,7 +319,7 @@ object SmsDateFormats {
         return when {
             diff < oneDay -> {
                 val text = local.toLocalTime().format(formatsFor(appLanguage).clock)
-                if (useShamsi && isPersian) toPersianDigits(text) else text
+                digits(text, appLanguage)
             }
             diff < 7 * oneDay -> {
                 if (useShamsi && isPersian) {
@@ -307,8 +328,11 @@ object SmsDateFormats {
                     local.toLocalDate().format(formatsFor(appLanguage).weekday)
                 }
             }
-            else -> if (useShamsi) shamsiDate(timestamp, appLanguage, now)
-            else local.toLocalDate().format(formatsFor(appLanguage).monthDay)
+            else -> if (useShamsi) {
+                shamsiDate(timestamp, appLanguage, now)
+            } else {
+                digits(local.toLocalDate().format(formatsFor(appLanguage).monthDay), appLanguage)
+            }
         }
     }
 }
