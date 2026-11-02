@@ -124,14 +124,14 @@ import com.ramesh.sms.ui.components.ContactProfileDialog
 import com.ramesh.sms.ui.components.ConversationAvatar
 import com.ramesh.sms.ui.components.ForwardMessageDialog
 import com.ramesh.sms.ui.components.MessageBubble
-import com.ramesh.sms.ui.components.MessageMiniMenu
-import com.ramesh.sms.ui.components.ReportSpamDialog
+import com.ramesh.sms.ui.components.MessageActionBar
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
 import com.ramesh.sms.ui.util.ContactUtils
 import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.util.contentAware
+import com.ramesh.sms.data.util.findOtpHighlight
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
@@ -178,17 +178,23 @@ fun ChatScreen(
 
     val textToolbar = LocalTextToolbar.current
     var selectedMessageForDialog by remember { mutableStateOf<SmsMessage?>(null) }
-    // A single tap on a bubble opens the mini-menu; the rest is what that menu can start.
-    var miniMenuMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    // A single tap on a bubble opens the action strip; the rest is what that strip can start.
+    var actionBarMessage by remember { mutableStateOf<SmsMessage?>(null) }
     var forwardBody by remember { mutableStateOf<String?>(null) }
     var forwardTargets by remember { mutableStateOf<List<ConversationThread>>(emptyList()) }
-    var reportSpamBody by remember { mutableStateOf<String?>(null) }
-    var reportSpamNumber by remember { mutableStateOf("") }
     var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
     val selectedMessageIds = viewModel.selectedMessageIds
     val isSelectionMode = viewModel.isSelectionMode
     var activeTextBubbleId by remember { mutableStateOf<Long?>(null) }
     var selectionResetTick by remember { mutableStateOf(0) }
+    // One clipboard path for the strip and the long-press dialog: same label, same toast.
+    val copyToClipboard: (String) -> Unit = { text ->
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText(context.getString(R.string.chat_sms_message), text)
+        )
+        Toast.makeText(context, context.getString(R.string.chat_copied), Toast.LENGTH_SHORT).show()
+    }
     var hasInitiallyScrolled by remember(nav.threadId, nav.address, nav.initialMessageId) { mutableStateOf(false) }
     var highlightedMessageId by remember(nav.threadId, nav.address, nav.initialMessageId) {
         mutableStateOf(nav.initialMessageId)
@@ -722,7 +728,7 @@ fun ChatScreen(
                     isSelectionMode = isSelectionMode,
                     selectedMessageIds = selectedMessageIds,
                     onTapMessage = onTapMessage,
-                    onTapBubble = { message -> miniMenuMessage = message },
+                    onTapBubble = { message -> actionBarMessage = message },
                     activeTextBubbleId = activeTextBubbleId,
                     selectionResetTick = selectionResetTick,
                     onBubbleTouched = { id -> activeTextBubbleId = id },
@@ -819,26 +825,29 @@ fun ChatScreen(
         )
     }
 
-    // Mini-menu: one tap on a bubble. Copy / forward / more, with the text selectable inside so a
-    // part of a long message can be copied without fighting the list's gestures.
-    miniMenuMessage?.let { message ->
-        MessageMiniMenu(
-            message = message,
-            useShamsi = state.showShamsiDate,
-            appLanguage = state.appLanguage,
-            onDismiss = { miniMenuMessage = null },
-            onCopy = { text ->
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(
-                    ClipData.newPlainText(context.getString(R.string.chat_sms_message), text)
-                )
-                Toast.makeText(context, context.getString(R.string.chat_copied), Toast.LENGTH_SHORT).show()
+    // Action strip: one tap on a bubble. A single horizontal bar with Copy, React, Share, Forward,
+    // Delete, Info and Mark as read - the Textra layout - floating over the top of the chat so the
+    // message it acts on stays visible underneath.
+    actionBarMessage?.let { message ->
+        val otpCode = remember(message.id, message.body) {
+            findOtpHighlight(message.body)?.code
+        }
+        MessageActionBar(
+            otpCode = otpCode,
+            onCopyCode = {
+                actionBarMessage = null
+                copyToClipboard(otpCode.orEmpty())
             },
-            onForward = {
-                forwardBody = message.body
-                coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
+            onCopy = {
+                actionBarMessage = null
+                copyToClipboard(message.body)
+            },
+            onReact = {
+                actionBarMessage = null
+                reactionPickerMessageId = message.id
             },
             onShare = {
+                actionBarMessage = null
                 val share = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, message.body)
@@ -849,18 +858,24 @@ fun ChatScreen(
                     )
                 }
             },
-            onInfo = { selectedMessageForDialog = message },
-            onReact = { reactionPickerMessageId = message.id },
-            onSelect = { viewModel.enterSelectionMode(message.id) },
-            onReportSpam = {
-                reportSpamBody = message.body
-                reportSpamNumber = viewModel.spamReportNumber()
+            onForward = {
+                actionBarMessage = null
+                forwardBody = message.body
+                coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
             },
-            onToggleDateFormat = if (state.enableDateTapShamsiToggle) {
-                { viewModel.toggleShamsiDate() }
-            } else {
-                null
-            }
+            onDelete = {
+                actionBarMessage = null
+                viewModel.deleteMessage(message.id)
+            },
+            onInfo = {
+                actionBarMessage = null
+                selectedMessageForDialog = message
+            },
+            onMarkRead = {
+                actionBarMessage = null
+                viewModel.markConversationRead()
+            },
+            onDismiss = { actionBarMessage = null }
         )
     }
 
@@ -878,23 +893,6 @@ fun ChatScreen(
                         } else {
                             R.string.chat_menu_forward_failed
                         },
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        )
-    }
-
-    reportSpamBody?.let { body ->
-        ReportSpamDialog(
-            initialNumber = reportSpamNumber,
-            onDismiss = { reportSpamBody = null },
-            onSend = { number ->
-                reportSpamBody = null
-                viewModel.reportSpam(body, number) { result ->
-                    Toast.makeText(
-                        context,
-                        if (result.sent) R.string.chat_menu_report_sent else R.string.chat_menu_report_failed,
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -1121,7 +1119,7 @@ private fun ChatMessageList(
     isSelectionMode: Boolean = false,
     selectedMessageIds: Set<Long> = emptySet(),
     onTapMessage: (SmsMessage) -> Unit = {},
-    /** A single tap on a bubble, which opens the mini-menu. */
+    /** A single tap on a bubble, which opens the action strip. */
     onTapBubble: (SmsMessage) -> Unit = {},
     activeTextBubbleId: Long? = null,
     selectionResetTick: Int = 0,

@@ -18,22 +18,12 @@
     <string name="chat_sending_in">Sending in %1$d s</string>
     <string name="chat_sms_message">SMS message</string>
     <string name="chat_composer_hint">Text message (SMS)…</string>
-    <string name="chat_menu_more">More</string>
     <string name="chat_menu_share">Share</string>
     <string name="chat_menu_forward">Forward</string>
     <string name="chat_menu_forward_title">Forward to</string>
     <string name="chat_menu_forward_empty">No conversations to forward to yet</string>
     <string name="chat_menu_forward_sent">Forwarded</string>
     <string name="chat_menu_forward_failed">Could not forward the message</string>
-    <string name="chat_menu_select">Select</string>
-    <string name="chat_menu_report_spam">Report spam</string>
     <string name="chat_menu_otp">Code %1$s</string>
     <string name="chat_menu_otp_copy">Copy code</string>
-    <string name="chat_menu_report_title">Report spam</string>
-    <string name="chat_menu_report_body">Ramesh sends this message to the spam-report number of your operator and remembers it for next time. Iranian operators publish different numbers, so check yours before saving.</string>
-    <string name="chat_menu_report_number">Report number</string>
-    <string name="chat_menu_report_send">Send report</string>
-    <string name="chat_menu_report_sent">Report sent</string>
-    <string name="chat_menu_report_failed">Could not send the report</string>
-    <string name="chat_menu_date_toggle">Tap a date in the message to switch calendar</string>
-</resources>
+    <string name="chat_mark_read">Mark as read</string></resources>

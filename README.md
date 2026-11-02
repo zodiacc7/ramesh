@@ -53,10 +53,12 @@ design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the open audit
   media decoding all happen on-device.
 - **RTL-aware.** Persian and Arabic message bodies render with the correct direction and
   punctuation even in the English UI, and dates can be shown in the Shamsi calendar.
-- **Tap a message to act on it.** A tap opens a small menu — copy, forward, or more (share, react,
-  info, select, report spam). The text stays selectable inside that menu, so you can copy part of a
-  long message; links, phone numbers and dates there open the browser, the dialer or the calendar,
-  and a verification code appears as a one-tap chip.
+- **Tap a message to act on it.** A tap opens one horizontal strip over the chat — the way Textra
+  does it — with **Copy**, react, share, forward, delete, info and mark-as-read all in a row, so no
+  action is buried behind a submenu. A verification code appears as a one-tap chip on the left of
+  the strip; long-pressing a message still opens the options dialog, where the whole text stays
+  selectable so you can copy part of a long message, and links, phone numbers and dates in it open
+  the browser, the dialer or the calendar.
 - **Reactions that stay in place.** Long-press any message and drop an emoji reaction on it —
   stored locally and shown as a chip under the bubble. Reaction SMS that other clients send as
   text (`Reacted 👍 to "…"`) are recognised and folded onto the message they answer instead of
@@ -276,10 +278,12 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
   کاملاً روی گوشی انجام می‌شود.
 - **پشتیبانی از راست‌به‌چپ.** متن فارسی و عربی با جهت و نشانه‌گذاری درست نمایش داده می‌شود و
   تاریخ‌ها را می‌توان شمسی دید.
-- **لمس پیام، منوی کارها.** با یک لمس روی هر پیام منوی کوچکی باز می‌شود: کپی، بازفرست و بیشتر
-  (اشتراک‌گذاری، واکنش، اطلاعات، انتخاب، گزارش اسپم). متن داخل همان منو قابل انتخاب می‌ماند، پس
-  می‌توانید بخشی از یک پیام بلند را کپی کنید؛ لینک، شمارهٔ تلفن و تاریخ همان‌جا مرورگر، تماس‌گیر یا
-  تقویم را باز می‌کنند و کد تأیید به‌صورت یک تراشهٔ یک‌لمسی نشان داده می‌شود.
+- **لمس پیام، نوار کارها.** با یک لمس روی هر پیام یک نوار افقی روی گفتگو باز می‌شود (همان شکل
+  Textra): **کپی**، واکنش، اشتراک‌گذاری، بازفرست، حذف، اطلاعات و علامت‌گذاری به‌عنوان خوانده‌شده،
+  همه در یک ردیف و بدون زیرمنو. کد تأیید به‌صورت یک تراشهٔ یک‌لمسی در سمت چپ نوار می‌آید؛
+  نگه‌داشتن پیام هم دیالوگ گزینه‌ها را باز می‌کند که متن کامل در آن قابل انتخاب می‌ماند، پس می‌توانید
+  بخشی از یک پیام بلند را کپی کنید و لینک، شمارهٔ تلفن و تاریخ همان‌جا مرورگر، تماس‌گیر یا تقویم را
+  باز می‌کنند.
 - **واکنش‌ها سر جای خودشان.** با نگه‌داشتن هر پیام می‌توانید به آن واکنش بدهید؛ واکنش‌ها روی
   گوشی ذخیره و زیر حباب نمایش داده می‌شوند. واکنش‌هایی که برنامه‌های دیگر به‌صورت متن می‌فرستند
   (`Reacted 👍 to "…"`) شناسایی و زیر همان پیام می‌نشینند، نه به‌شکل یک پیام جدا.

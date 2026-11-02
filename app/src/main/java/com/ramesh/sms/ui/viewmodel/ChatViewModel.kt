@@ -396,22 +396,6 @@ class ChatViewModel(
         }
     }
 
-    /** The saved operator report number, or an empty string when the user never set one. */
-    fun spamReportNumber(): String = userPreferences.spamReportNumber
-
-    /** Files a spam report for [body] at [number] and remembers the number for next time. */
-    fun reportSpam(body: String, number: String, onComplete: (SendSmsResult) -> Unit = {}) {
-        val target = number.trim()
-        if (target.isBlank()) {
-            onComplete(SendSmsResult(sent = false, storedInProvider = false))
-            return
-        }
-        userPreferences.spamReportNumber = target
-        viewModelScope.launch {
-            onComplete(repository.sendSms(target, body))
-        }
-    }
-
     fun sendMessage(text: String, onComplete: (SendSmsResult) -> Unit = {}) {
         if (text.isBlank()) return
         if (pendingSendJob?.isActive == true) return

@@ -1,17 +1,16 @@
-Ramesh 1.1.0 (build 1101) — pre-release. Tap a message to do something with it.
+Ramesh 1.1.0 (build 1101) — pre-release, updated build.
 
-What is new:
-- Tap a message bubble to open a small menu: Copy, Forward and More. Holding a message still selects it, exactly as before.
-- More holds Share, React, Info, Select and Report spam. Share sends the text to any other app; Report spam sends it to your operator's report number, which you enter once and can change later (there is no universal number, so Ramesh never guesses one).
-- The message text inside the menu is selectable, so you can copy just a part of a long message.
-- Links, phone numbers and dates inside that menu are tappable: a link opens in the browser, a number in the dialer, and a date switches the calendar.
-- A verification code in the message appears as a chip at the top of the menu; one tap copies the code itself, not the whole message.
-- Forward shows your recent conversations and sends the original text as a normal SMS.
+The message menu is now a horizontal bar, the way Textra does it:
+- One tap on a bubble shows a single strip: Copy · React · Share · Forward · Delete · Info · Mark as read. Nothing hides behind a "More" submenu, and the strip sits over the top of the chat so the message it acts on stays readable.
+- Hold a message to select it, as before; full-text selection also lives in the long-press "Message options" dialog, so you can still copy just a part of a long message.
+- A verification code in the message appears as a chip on the left of the strip; one tap copies the code itself, not the whole message.
+- Report spam was removed from the menu. Iranian operators publish different report numbers, so the action had no dependable target; a wrong report is worse than none.
+- Forward still shows your recent conversations and sends the original text as a normal SMS.
 
-Fixed — dates no longer disagree between tabs:
-- The conversation list only honoured the "Jalali everywhere" setting, while the chat screen also followed the calendar switch you get by tapping a date. The same inbox could therefore show Shamsi dates in one place and Gregorian ones in another. Both now use one rule.
-- With the language set to "System default" on a Persian phone, the list formatted dates as English (Latin digits, "Shahrivar 23"); it now follows the device language like the rest of the app.
-- Search results were formatted with the device locale instead of the app language, so they could mix Latin and Persian digits.
+Fixed — dates in every tab and list:
+- The date formatters used to be built once, with the phone's own language, instead of the language chosen inside Ramesh. On an English phone running the Persian UI they produced English weekday and month names.
+- It looked random because the list picks a different pattern per row age: time for today, weekday for this week, full date beyond. A single list could show `۱۹:۳۳` next to `Sep 14`, and which rows disagreed depended on how old each message was — which is why the tabs seemed to use different formats.
+- Formatting is now built per app language (Persian → fa-IR, English → en, System default → the phone), so chat, inbox, tabs and search results all print dates the same way, and switching the language repaints them immediately.
 
 This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.
 
