@@ -162,13 +162,28 @@ class SenderTabTest {
     }
 
     @Test
-    fun badgeCountsASpamOnlyConversationTheInboxHides() {
+    fun aSpamOnlyConversationIsBothCountedAndShownInAll() {
         val spamOnly = unreadThread(1L, "09120000000", newSpamCount = 1, spamOnly = true)
 
-        // The inbox hides spam-only threads, but the arrival still has to be visible somewhere.
-        assertTrue(visibleThreadsForTab(listOf(spamOnly), null).isEmpty())
+        // The badge, the list and the spam chip have to agree: a number with no row behind it was
+        // exactly the bug where the tab said 1 and nothing on screen explained it.
+        assertEquals(listOf(spamOnly), visibleThreadsForTab(listOf(spamOnly), null))
         assertEquals(1, badgeCountForTab(listOf(spamOnly), null))
         assertEquals(listOf(spamOnly), countableThreadsForTab(listOf(spamOnly), null))
+    }
+
+    @Test
+    fun aCustomTabStillDropsSpamOnlyConversations() {
+        val spamOnly = unreadThread(1L, "09120000000", spamOnly = true)
+        val tab = SenderTab(
+            id = 1L,
+            name = "Everything",
+            filterMask = SenderTab.MASK_NON_SPAM_ONLY
+        )
+
+        // Inside a "not spam" tab such a row would be empty, so it stays out - but All shows it.
+        assertTrue(visibleThreadsForTab(listOf(spamOnly), tab).isEmpty())
+        assertEquals(1, badgeCountForTab(listOf(spamOnly), tab))
     }
 
     @Test

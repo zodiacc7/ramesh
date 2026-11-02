@@ -96,13 +96,19 @@ every action is one tap away. Copy is the one action with a text label; the rest
 and on the content description read by TalkBack. When a verification code was detected, `findOtpHighlight` provides a chip on the left of
 the strip that copies the code itself.
 
+The strip fades in and out in place (`Animatable` alpha, closed through `closeActionBar`, which hides
+it and drops it 150 ms later). Only a fade: a positional or scaled entrance reads differently on the
+right-hand bubbles than on the left-hand ones. The share glyph is `RameshIcons.Share`, drawn here
+because Material's `Share` has no arrowhead and Textra's does. The read marker keeps one icon (the
+double check) and toggles; marking a conversation unread needs `ChatViewModel.suppressAutoRead`,
+because opening a chat reloads it and the reload marks everything read.
+
 Two actions are deliberately not single-tap: delete arms on the first tap (the bin turns red and
 filled) and only deletes on the second, and the read marker toggles rather than only marking read -
 on a conversation with nothing unread it marks the conversation *unread*, which is the only way that
-button can do something visible in both states. Copy does both things at once: it puts the whole body
-on the clipboard and opens `SelectableMessageDialog`, a read-only `BasicTextField` whose selection
-starts as the entire text, so a single line can be narrowed down and copied on its own. Info opens
-`MessageDetailsDialog` (type, SIM slot, SIM name, the other party, sent and delivered times).
+button can do something visible in both states. Copy is just copy: the text goes to the clipboard
+and nothing opens over the conversation. Info opens `MessageDetailsDialog` (type, SIM slot, SIM name,
+the other party, sent and delivered times).
 
 Holding a message still enters selection mode, so the two gestures never compete. Full-text
 selection also lives in the long-press "Message options" dialog, which keeps the body in a
@@ -185,8 +191,14 @@ Ramesh is never overwritten by a network one.
 thread's `unreadCount`. A spam arrival instead sets `spam_message_meta.is_new`, and
 `cached_threads.new_spam_count` carries that number into `ConversationThread.newSpamCount`. The tab
 badges use `badgeCountForTab` (`unreadCount + newSpamCount`) so an arrival the user was never
-notified about is still visible, including spam-only conversations the inbox itself hides.
-`markNewSpamSeen` clears the flag when the conversation is opened.
+notified about is still visible. `markNewSpamSeen` clears the flag when the conversation is opened.
+
+A counted number has to have a row behind it, which is where this used to break: a spam-only
+conversation was dropped from "All", so the badge counted a message no row ever showed. `All` now
+keeps them (`visibleThreadsForTab`, `ConversationsViewModel.filterThreads`) and they arrive flagged
+instead of hidden - the row carries a shield chip with the unread spam count, tinted, and tapping it
+opens the thread at `ConversationThread.newestSpamMessageId` (filled on a live read, deliberately
+not persisted in the cache) so the filtered message is the one on screen, highlighted.
 
 ## Localisation
 

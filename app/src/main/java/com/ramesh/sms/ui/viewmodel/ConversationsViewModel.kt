@@ -392,7 +392,12 @@ class ConversationsViewModel(
         // A spam-only conversation has no content left to open, so it never becomes an empty row
         // in the inbox or in a "not spam" filter tab.
         val spamTabSelected = tab?.spamOnly == true
-        val usable = threads.filter { it.messageCount > 0 && (spamTabSelected || !it.spamOnly) }
+        // The All tab is the one list that must hold everything the phone has: a conversation whose
+        // messages are all spam was being dropped from it, which made messages that do exist look
+        // missing. Only the per-tab lists keep that rule, where a spam-only row would be empty.
+        val usable = threads.filter {
+            it.messageCount > 0 && (tab == null || spamTabSelected || !it.spamOnly)
+        }
         val tabFiltered = if (tab != null) {
             usable.filter { threadMatchesTab(it, tab) }
         } else {

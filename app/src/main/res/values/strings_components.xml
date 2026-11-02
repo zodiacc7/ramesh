@@ -44,4 +44,7 @@
     <string name="chat_delete_messages_title">Delete messages?</string>
     <string name="chat_delete_messages_body">Are you sure you want to delete %1$d selected messages? This action cannot be undone.</string>
     <string name="chat_react_action">React</string>
+    <string name="comp_reveal">Reveal</string>
+    <string name="comp_hide">Hide</string>
+    <string name="inbox_spam_with_new">Spam %1$d</string>
 </resources>

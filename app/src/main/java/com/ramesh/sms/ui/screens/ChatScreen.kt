@@ -130,7 +130,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
 import com.ramesh.sms.ui.components.MessageActionBar
 import com.ramesh.sms.ui.components.MessageDetailsDialog
-import com.ramesh.sms.ui.components.SelectableMessageDialog
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
@@ -188,8 +187,8 @@ fun ChatScreen(
     var actionBarMessage by remember { mutableStateOf<SmsMessage?>(null) }
     var actionBarAnchor by remember { mutableStateOf<Rect?>(null) }
     var deleteArmed by remember { mutableStateOf(false) }
-    /** Text shown in the "copy text" dialog, where the whole body starts selected. */
-    var copyText by remember { mutableStateOf<String?>(null) }
+    // Kept separate from actionBarMessage so the strip can fade out before it is removed.
+    var actionBarVisible by remember { mutableStateOf(true) }
     var detailsMessage by remember { mutableStateOf<SmsMessage?>(null) }
     // Bubble bounds, in root coordinates, recorded as the list lays out. A plain map on purpose:
     // this is read once per tap, so it must not trigger a recomposition on every scroll frame.
@@ -202,6 +201,20 @@ fun ChatScreen(
     val isSelectionMode = viewModel.isSelectionMode
     var activeTextBubbleId by remember { mutableStateOf<Long?>(null) }
     var selectionResetTick by remember { mutableStateOf(0) }
+    // Every action closes the strip the same way: fade out, then drop it. Removing it outright made
+    // it pop while the fade-in on the way in was still visible.
+    val closeActionBar: () -> Unit = {
+        if (actionBarVisible || actionBarMessage != null) {
+            actionBarVisible = false
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(150)
+                actionBarMessage = null
+                deleteArmed = false
+                actionBarVisible = true
+            }
+        }
+    }
+
     // One clipboard path for the strip and the long-press dialog: same label, same toast.
     val copyToClipboard: (String) -> Unit = { text ->
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -748,6 +761,7 @@ fun ChatScreen(
                     onTapMessage = onTapMessage,
                     onTapBubble = { message ->
                         deleteArmed = false
+                        actionBarVisible = true
                         actionBarAnchor = bubbleBounds[message.id]?.translate(
                             -contentOrigin.x,
                             -contentOrigin.y
@@ -811,6 +825,7 @@ fun ChatScreen(
                     val threadIsRead = state.messages.none { it.isInbox && !it.read }
                     MessageActionBar(
                         anchor = anchorRect,
+                        visible = actionBarVisible,
                         otpCode = remember(message.id, message.body) {
                             findOtpHighlight(message.body)?.code
                         },
@@ -818,22 +833,21 @@ fun ChatScreen(
                         markedRead = threadIsRead,
                         deleteArmed = deleteArmed,
                         onCopyCode = {
-                            actionBarMessage = null
+                            closeActionBar()
                             copyToClipboard(findOtpHighlight(message.body)?.code.orEmpty())
                         },
                         onCopy = {
-                            actionBarMessage = null
+                            // Copy is copy: the text goes to the clipboard from here, and nothing
+                            // else opens over the conversation.
+                            closeActionBar()
                             copyToClipboard(message.body)
-                            // Same tap, second half: open the body with everything selected so a
-                            // single line can be picked out of a long message.
-                            copyText = message.body
                         },
                         onReact = {
-                            actionBarMessage = null
+                            closeActionBar()
                             reactionPickerMessageId = message.id
                         },
                         onShare = {
-                            actionBarMessage = null
+                            closeActionBar()
                             val share = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, message.body)
@@ -848,14 +862,13 @@ fun ChatScreen(
                             }
                         },
                         onForward = {
-                            actionBarMessage = null
+                            closeActionBar()
                             forwardBody = message.body
                             coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
                         },
                         onDelete = {
                             if (deleteArmed) {
-                                actionBarMessage = null
-                                deleteArmed = false
+                                closeActionBar()
                                 viewModel.deleteMessage(message.id)
                             } else {
                                 // First tap only opens the bin; the second one deletes.
@@ -863,17 +876,23 @@ fun ChatScreen(
                             }
                         },
                         onInfo = {
-                            actionBarMessage = null
+                            closeActionBar()
                             detailsMessage = message
                         },
                         onToggleRead = {
-                            actionBarMessage = null
-                            viewModel.toggleConversationRead()
+                            closeActionBar()
+                            viewModel.toggleConversationRead { nowRead ->
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        if (nowRead) R.string.chat_marked_read
+                                        else R.string.chat_marked_unread
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         },
-                        onDismiss = {
-                            actionBarMessage = null
-                            deleteArmed = false
-                        },
+                        onDismiss = { closeActionBar() },
                         modifier = Modifier.zIndex(6f)
                     )
                 }
@@ -883,19 +902,9 @@ fun ChatScreen(
 
     // Scrolling moves the bubble out from under its strip, so the strip goes with it.
     LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            actionBarMessage = null
-            deleteArmed = false
+        if (listState.isScrollInProgress && actionBarMessage != null) {
+            closeActionBar()
         }
-    }
-
-    // Copy with the whole body selected, ready to be narrowed down to one line.
-    copyText?.let { text ->
-        SelectableMessageDialog(
-            text = text,
-            onCopy = { picked -> copyToClipboard(picked) },
-            onDismiss = { copyText = null }
-        )
     }
 
     // "Message details", the way Textra lays it out.
@@ -1171,11 +1180,6 @@ fun ChatScreen(
     }
 }
 
-/**
- * Only bubbles younger than this animate in. Anything older is history (opening the thread, paging
- * back, switching tabs) and must appear instantly instead of performing a slideshow.
- */
-private const val FRESH_BUBBLE_WINDOW_MS = 15_000L
 
 @Composable
 private fun ChatMessageList(
@@ -1222,8 +1226,10 @@ private fun ChatMessageList(
     // Navigation.kt). Inside an already open chat a brand-new bubble keeps a short, fixed entrance
     // of its own so an arriving message does not just pop into place; history and re-bound rows
     // start fully visible.
-    val newestId = reversedMessages.firstOrNull()?.id
     val alreadyAnimated = remember { mutableSetOf<Long>() }
+    // When the chat was opened. Only messages newer than this arrived while it was on screen, so
+    // only those animate: the last message of the conversation used to slide in on every visit.
+    val openedAt = remember { System.currentTimeMillis() }
 
     LazyColumn(
         state = listState,
@@ -1262,8 +1268,7 @@ private fun ChatMessageList(
             // (history, rows re-bound after a scroll) starts fully visible, so the list can never
             // come back stuck at alpha 0 or perform a slideshow.
             val animateIn = message.id !in alreadyAnimated &&
-                (message.id == newestId ||
-                    System.currentTimeMillis() - message.date < FRESH_BUBBLE_WINDOW_MS)
+                message.date > openedAt
             val bubbleVisible = remember(message.id) {
                 MutableTransitionState(!animateIn).apply { targetState = true }
             }

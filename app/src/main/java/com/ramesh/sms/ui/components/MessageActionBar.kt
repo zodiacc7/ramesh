@@ -1,5 +1,7 @@
 package com.ramesh.sms.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -24,15 +26,14 @@ import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MarkChatRead
-import androidx.compose.material.icons.filled.MarkChatUnread
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ramesh.sms.R
 import com.ramesh.sms.theme.PillShape
+import com.ramesh.sms.theme.RameshIcons
 import kotlin.math.roundToInt
 
 /**
@@ -75,6 +77,7 @@ import kotlin.math.roundToInt
 @Composable
 fun MessageActionBar(
     anchor: Rect,
+    visible: Boolean = true,
     otpCode: String?,
     canReact: Boolean,
     markedRead: Boolean,
@@ -92,6 +95,12 @@ fun MessageActionBar(
 ) {
     var barSize by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
+    // One animation for every bubble, sent or received: the strip fades in and out in place. Any
+    // positional entrance read differently on right-hand bubbles than on left-hand ones.
+    val fade = remember { Animatable(0f) }
+    LaunchedEffect(visible) {
+        fade.animateTo(if (visible) 1f else 0f, tween(130))
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val gap = with(density) { 8.dp.toPx() }
@@ -131,7 +140,7 @@ fun MessageActionBar(
                 .widthIn(max = 560.dp)
                 // Hidden for the single frame before its size is known, so it never flickers at the
                 // bubble's corner and then jumps above it.
-                .alpha(if (barSize == IntSize.Zero) 0f else 1f)
+                .alpha(if (barSize == IntSize.Zero) 0f else fade.value)
                 .onSizeChanged { barSize = it }
         ) {
             Row(
@@ -171,7 +180,8 @@ fun MessageActionBar(
                         )
                     }
                     BarAction(
-                        icon = Icons.Default.Share,
+                        // Custom glyph: Material's share icon has no arrowhead, Textra's has.
+                        icon = RameshIcons.Share,
                         label = stringResource(R.string.chat_menu_share),
                         onClick = onShare
                     )
@@ -197,7 +207,9 @@ fun MessageActionBar(
                         onClick = onInfo
                     )
                     BarAction(
-                        icon = if (markedRead) Icons.Default.MarkChatUnread else Icons.Default.MarkChatRead,
+                        // One glyph, always: the double check. Only the state changes, so the button
+                        // keeps its identity between taps.
+                        icon = Icons.Default.DoneAll,
                         label = if (markedRead) {
                             stringResource(R.string.chat_mark_unread)
                         } else {

@@ -46,6 +46,13 @@ data class ConversationThread(
     val hasSpam: Boolean = false,
     val isUnreadSpam: Boolean = false,
     val lastMessageAction: FilterAction = FilterAction.NORMAL,
+    /**
+     * The newest filtered-spam message in this conversation, when the newest received message is the
+     * spam one. The inbox uses it to open a spam row *at* the message that was filtered instead of
+     * leaving the user to hunt for it. Not persisted in the cached snapshot: a stale id there is
+     * worse than none, so it is filled only on a live provider read and falls back to null.
+     */
+    val newestSpamMessageId: Long? = null,
     /** True when every received message in this thread is spam, so the thread holds no content. */
     val spamOnly: Boolean = false,
     val subId: Int = SubscriptionManager.INVALID_SUBSCRIPTION_ID,

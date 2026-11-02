@@ -1,0 +1,21 @@
+Ramesh 1.1.0.04 (build 1010004) — pre-release.
+
+Spam is now visible where it was only counted:
+- Every conversation that holds filtered spam carries a shield chip in the inbox, whether or not you have already opened it. Before, the mark appeared only while the spam was still unread, so the moment you tapped the spam tab nothing on screen told you which rows those were.
+- The chip shows how many filtered messages are still unread ("Spam 2"), so the number on the tab badge can be traced to actual rows.
+- Spam rows are tinted instead of being faded to 46% — the old dimming made the whole row look broken rather than suspicious.
+- Tapping a spam row now opens that conversation scrolled to the filtered message and highlights it, instead of dropping you at the bottom of the thread to hunt for it.
+- The All tab shows spam-only conversations too. Leaving them out is why the badge counted a message no row ever displayed.
+- Reveal/Hide in a filtered message is translated now (it was hard-coded English).
+
+The action strip:
+- It fades in and out in place on every message, sent or received. Before, it faded on received bubbles and slid on sent ones.
+- The share icon is the glyph with the arrowhead, matching the picture.
+- The read button keeps one icon (the double check) and now really toggles: on a conversation with nothing unread it marks it unread, and it stays that way.
+- Copy copies the message; no extra window opens over the conversation.
+
+Opening a conversation no longer animates the last message downwards; only a message that arrives while you are reading gets an entrance animation.
+
+Dates are untouched in this build.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.
