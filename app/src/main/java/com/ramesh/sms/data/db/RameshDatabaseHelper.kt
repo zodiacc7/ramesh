@@ -692,7 +692,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
             val placeholders = variants.joinToString(",") { "?" }
             val cursor = readableDatabase.query(
                 "spam_message_meta",
-                arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action"),
+                arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action", "is_new"),
                 "address IN ($placeholders)",
                 variants,
                 null, null, null
@@ -709,7 +709,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
         val result = mutableMapOf<Long, SpamMessageMeta>()
         val cursor = readableDatabase.query(
             "spam_message_meta",
-            arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action"),
+            arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action", "is_new"),
             null, null, null, null, null
         )
         cursor.use {
@@ -730,7 +730,7 @@ class RameshDatabaseHelper private constructor(context: Context) :
                 val args = chunk.map { it.toString() }.toTypedArray()
                 val cursor = db.query(
                     "spam_message_meta",
-                    arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action"),
+                    arrayOf("message_id", "is_spam", "matched_rule_name", "is_revealed", "action", "is_new"),
                     "message_id IN ($placeholders)",
                     args,
                     null, null, null
@@ -1489,11 +1489,15 @@ class RameshDatabaseHelper private constructor(context: Context) :
         } catch (e: Exception) {
             if (isSpam) FilterAction.SPAM else FilterAction.NORMAL
         }
+        // `is_new` is what the tab badge counts for silent spam; the same flag has to reach the
+        // message so a row and a bubble can say *which* arrival that number is about.
+        val isNew = cursor.getInt(5) == 1
         return SpamMessageMeta(
             isSpam = isSpam,
             matchedRuleName = rule,
             isRevealed = isRevealed,
-            action = action
+            action = action,
+            isNew = isNew
         )
     }
 
@@ -1562,7 +1566,9 @@ data class SpamMessageMeta(
     val isSpam: Boolean,
     val matchedRuleName: String?,
     val isRevealed: Boolean,
-    val action: FilterAction
+    val action: FilterAction,
+    /** True until the conversation is opened: drives the tab badge and the "new spam" marks. */
+    val isNew: Boolean = false
 )
 
 data class FilterRuleOverride(

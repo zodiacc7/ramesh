@@ -8,12 +8,15 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +27,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,10 +36,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddReaction
@@ -46,17 +49,21 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -64,6 +71,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -72,11 +80,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.TopAppBar
-import androidx.compose.animation.core.MutableTransitionState
-import com.ramesh.sms.theme.messageEnterTransition
-import com.ramesh.sms.theme.messageExitTransition
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -87,57 +91,59 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramesh.sms.ChatNav
-import com.ramesh.sms.data.model.SimInfo
-import com.ramesh.sms.data.util.AppLanguage
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import com.ramesh.sms.data.model.ConversationThread
-import com.ramesh.sms.data.model.SmsMessage
-import com.ramesh.sms.data.util.foldSmsReactions
 import com.ramesh.sms.R
+import com.ramesh.sms.data.model.ConversationThread
+import com.ramesh.sms.data.model.SimInfo
+import com.ramesh.sms.data.model.SmsMessage
+import com.ramesh.sms.data.util.AppLanguage
+import com.ramesh.sms.data.util.findOtpHighlight
+import com.ramesh.sms.data.util.foldSmsReactions
 import com.ramesh.sms.theme.AppearanceStore
-import com.ramesh.sms.theme.MessageAnimation
 import com.ramesh.sms.theme.InputBarShape
+import com.ramesh.sms.theme.MessageAnimation
 import com.ramesh.sms.theme.PillShape
+import com.ramesh.sms.theme.RameshIcons
 import com.ramesh.sms.theme.SquircleCardShape
+import com.ramesh.sms.theme.messageEnterTransition
+import com.ramesh.sms.theme.messageExitTransition
 import com.ramesh.sms.ui.components.ChatBackdropBackground
 import com.ramesh.sms.ui.components.ChatDateHeader
 import com.ramesh.sms.ui.components.ContactProfileDialog
 import com.ramesh.sms.ui.components.ConversationAvatar
 import com.ramesh.sms.ui.components.ForwardMessageDialog
-import com.ramesh.sms.ui.components.MessageBubble
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.zIndex
 import com.ramesh.sms.ui.components.MessageActionBar
+import com.ramesh.sms.ui.components.MessageBubble
 import com.ramesh.sms.ui.components.MessageDetailsDialog
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
 import com.ramesh.sms.ui.util.ContactUtils
-import com.ramesh.sms.ui.util.senderDisplayName
-import com.ramesh.sms.ui.util.contentAware
-import com.ramesh.sms.data.util.findOtpHighlight
 import com.ramesh.sms.ui.util.SmsDateFormats
+import com.ramesh.sms.ui.util.contentAware
+import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
@@ -201,6 +207,10 @@ fun ChatScreen(
     val isSelectionMode = viewModel.isSelectionMode
     var activeTextBubbleId by remember { mutableStateOf<Long?>(null) }
     var selectionResetTick by remember { mutableStateOf(0) }
+    // Copy turns the bubble itself into selectable text (all of it selected) instead of opening a
+    // window over the conversation. The tick forces a re-selection when Copy is tapped again.
+    var inlineSelectMessageId by remember { mutableStateOf<Long?>(null) }
+    var inlineSelectTick by remember { mutableStateOf(0) }
     // Every action closes the strip the same way: fade out, then drop it. Removing it outright made
     // it pop while the fade-in on the way in was still visible.
     val closeActionBar: () -> Unit = {
@@ -322,6 +332,7 @@ fun ChatScreen(
     }
     val onClearTextSelection = remember(textToolbar) {
         {
+            inlineSelectMessageId = null
             if (textToolbar.status == TextToolbarStatus.Shown) {
                 selectionResetTick += 1
                 activeTextBubbleId = null
@@ -379,121 +390,45 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             if (isSelectionMode) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = stringResource(R.string.chat_selected_count, selectedMessageIds.size),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { viewModel.clearSelection() }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_cancel_selection))
-                        }
-                    },
-                    actions = {
-                        if (selectedMessageIds.size == 1) {
-                            val selectedId = selectedMessageIds.first()
-                            val activeReaction = state.messages.firstOrNull { it.id == selectedId }?.reaction
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Quick reactions right in the selection bar: tapping a message
-                                // used to hide the only react entry point behind a dialog.
-                                ReactionEmojis.take(3).forEach { emoji ->
-                                    val isActive = emoji == activeReaction
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(end = 4.dp)
-                                            .size(30.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (isActive) MaterialTheme.colorScheme.primaryContainer
-                                                else MaterialTheme.colorScheme.surfaceContainerHigh
-                                            )
-                                            .clickable {
-                                                viewModel.toggleReaction(selectedId, emoji)
-                                                viewModel.clearSelection()
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(text = emoji, fontSize = 15.sp)
-                                    }
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .padding(end = 6.dp)
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                        .clickable { reactionPickerMessageId = selectedId },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AddReaction,
-                                        contentDescription = stringResource(R.string.chat_react),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                SelectionTopBar(
+                    selectedCount = selectedMessageIds.size,
+                    selectedIds = selectedMessageIds,
+                    messages = state.messages,
+                    onClose = { viewModel.clearSelection() },
+                    onMarkRead = { viewModel.markSelectedMessagesRead() },
+                    onShare = { bodies ->
+                        if (bodies.isNotEmpty()) {
+                            val share = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, bodies.joinToString("\n\n"))
                             }
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.padding(end = 4.dp)
-                            ) {
-                                // Text is no longer selectable inside the bubble (that gesture is
-                                // the message selection now), so copying lives here.
-                                IconButton(
-                                    onClick = {
-                                        val body = state.messages.firstOrNull { it.id == selectedId }?.body
-                                        if (!body.isNullOrEmpty()) {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            clipboard.setPrimaryClip(ClipData.newPlainText("message", body))
-                                            Toast.makeText(context, R.string.chat_copied, Toast.LENGTH_SHORT).show()
-                                        }
-                                        viewModel.clearSelection()
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = stringResource(R.string.chat_copy),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
+                            runCatching {
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        share,
+                                        context.getString(R.string.chat_menu_share)
                                     )
-                                }
-                            }
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.padding(end = 6.dp)
-                            ) {
-                                IconButton(onClick = onShowInfoForSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = stringResource(R.string.chat_message_info),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            IconButton(onClick = { showBatchDeleteConfirmDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(R.string.chat_delete_selected),
-                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
+                        viewModel.clearSelection()
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                    onForward = { bodies ->
+                        if (bodies.isNotEmpty()) {
+                            forwardBody = bodies.joinToString("\n\n")
+                            coroutineScope.launch {
+                                forwardTargets = viewModel.forwardTargets()
+                            }
+                        }
+                        viewModel.clearSelection()
+                    },
+                    onDelete = { showBatchDeleteConfirmDialog = true },
+                    onCopy = { bodies ->
+                        if (bodies.isNotEmpty()) copyToClipboard(bodies.joinToString("\n\n"))
+                        viewModel.clearSelection()
+                    },
+                    onInfo = onShowInfoForSelected,
+                    onSelectAll = { viewModel.selectAllMessages() }
                 )
             } else {
                 TopAppBar(
@@ -771,6 +706,8 @@ fun ChatScreen(
                     onBubbleBounds = { id, bounds -> bubbleBounds[id] = bounds },
                     activeTextBubbleId = activeTextBubbleId,
                     selectionResetTick = selectionResetTick,
+                    inlineSelectMessageId = inlineSelectMessageId,
+                    inlineSelectTick = inlineSelectTick,
                     onBubbleTouched = { id -> activeTextBubbleId = id },
                     onOutsideTap = onClearTextSelection,
                     address = state.address,
@@ -822,7 +759,6 @@ fun ChatScreen(
             actionBarMessage?.let { message ->
                 val anchorRect = actionBarAnchor
                 if (anchorRect != null) {
-                    val threadIsRead = state.messages.none { it.isInbox && !it.read }
                     MessageActionBar(
                         anchor = anchorRect,
                         visible = actionBarVisible,
@@ -830,17 +766,20 @@ fun ChatScreen(
                             findOtpHighlight(message.body)?.code
                         },
                         canReact = !message.isSent,
-                        markedRead = threadIsRead,
+                        isSent = message.isSent,
                         deleteArmed = deleteArmed,
                         onCopyCode = {
                             closeActionBar()
                             copyToClipboard(findOtpHighlight(message.body)?.code.orEmpty())
                         },
                         onCopy = {
-                            // Copy is copy: the text goes to the clipboard from here, and nothing
-                            // else opens over the conversation.
-                            closeActionBar()
+                            // Copy takes the text and hands the bubble back as selectable text with
+                            // everything selected, so a part of a long message can be picked and
+                            // copied from the same place. No window opens over the conversation.
                             copyToClipboard(message.body)
+                            closeActionBar()
+                            inlineSelectMessageId = message.id
+                            inlineSelectTick += 1
                         },
                         onReact = {
                             closeActionBar()
@@ -879,18 +818,11 @@ fun ChatScreen(
                             closeActionBar()
                             detailsMessage = message
                         },
-                        onToggleRead = {
+                        onSelect = {
                             closeActionBar()
-                            viewModel.toggleConversationRead { nowRead ->
-                                Toast.makeText(
-                                    context,
-                                    context.getString(
-                                        if (nowRead) R.string.chat_marked_read
-                                        else R.string.chat_marked_unread
-                                    ),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                            // The double check acts on this message the way it does in Textra:
+                            // the message is selected and the selection bar opens.
+                            viewModel.enterSelectionMode(message.id)
                         },
                         onDismiss = { closeActionBar() },
                         modifier = Modifier.zIndex(6f)
@@ -1205,6 +1137,9 @@ private fun ChatMessageList(
     onBubbleBounds: (Long, Rect) -> Unit = { _, _ -> },
     activeTextBubbleId: Long? = null,
     selectionResetTick: Int = 0,
+    /** Bubble that Copy turned into selectable text, and a tick that re-selects it each time. */
+    inlineSelectMessageId: Long? = null,
+    inlineSelectTick: Int = 0,
     onBubbleTouched: (Long) -> Unit = {},
     onOutsideTap: () -> Unit = {},
     address: String = "",
@@ -1323,6 +1258,11 @@ private fun ChatMessageList(
                         onLongClick = { onLongClick(message) },
                         onTap = { if (!isSelectionMode) onTapBubble(message) },
                         onBubbleBounds = { bounds -> onBubbleBounds(message.id, bounds) },
+                        inlineSelectKey = if (message.id == inlineSelectMessageId) {
+                            inlineSelectTick
+                        } else {
+                            0
+                        },
                         isSelectionMode = isSelectionMode,
                         isSelected = message.id in selectedMessageIds,
                         onToggleSelect = { onTapMessage(message) },
@@ -1353,6 +1293,127 @@ private fun ChatMessageList(
             }
         }
     }
+}
+
+/**
+ * The bar that replaces the chat header while messages are selected.
+ *
+ * Laid out like Textra's: close, the double check that marks the conversation read, how many are
+ * selected, then share, forward and delete, with everything else behind one overflow. Reactions are
+ * deliberately absent - the strip on the message already carries them, and having them in both
+ * places was the confusing part.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectionTopBar(
+    selectedCount: Int,
+    selectedIds: Set<Long>,
+    messages: List<SmsMessage>,
+    onClose: () -> Unit,
+    onMarkRead: () -> Unit,
+    onShare: (List<String>) -> Unit,
+    onForward: (List<String>) -> Unit,
+    onDelete: () -> Unit,
+    onCopy: (List<String>) -> Unit,
+    onInfo: () -> Unit,
+    onSelectAll: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    // Computed per composition rather than remembered: the selection is a snapshot set that the
+    // bar mutates in place, so a remembered value would go stale.
+    val selectedBodies = messages.filter { it.id in selectedIds }.map { it.body }
+
+    TopAppBar(
+        title = {
+            Text(
+                text = stringResource(R.string.chat_selected_count, selectedCount),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.chat_cancel_selection)
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = onMarkRead) {
+                Icon(
+                    imageVector = Icons.Default.DoneAll,
+                    contentDescription = stringResource(R.string.chat_mark_read)
+                )
+            }
+            IconButton(onClick = { onShare(selectedBodies) }) {
+                Icon(
+                    // Same glyph as the strip, so "share" looks like one thing across the app.
+                    imageVector = RameshIcons.Share,
+                    contentDescription = stringResource(R.string.chat_menu_share)
+                )
+            }
+            IconButton(
+                onClick = { onForward(selectedBodies) },
+                enabled = selectedBodies.isNotEmpty()
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Forward,
+                    contentDescription = stringResource(R.string.chat_menu_forward)
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = stringResource(R.string.chat_delete_selected)
+                )
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.chat_menu_more)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_copy)) },
+                        onClick = {
+                            menuExpanded = false
+                            onCopy(selectedBodies)
+                        }
+                    )
+                    if (selectedCount == 1) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.chat_message_info)) },
+                            onClick = {
+                                menuExpanded = false
+                                onInfo()
+                            }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_select_all)) },
+                        onClick = {
+                            menuExpanded = false
+                            onSelectAll()
+                        }
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    )
 }
 
 private val ReactionEmojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉")

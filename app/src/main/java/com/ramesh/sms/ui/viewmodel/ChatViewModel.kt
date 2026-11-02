@@ -151,12 +151,6 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * Set while the user has explicitly marked this conversation unread, so the next reload does
-     * not silently mark it read again.
-     */
-    private var suppressAutoRead = false
-
     fun loadMessages(markAsRead: Boolean = isScreenResumed) {
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
@@ -168,7 +162,7 @@ class ChatViewModel(
                     _uiState.value = _uiState.value.copy(threadId = resolvedId)
                 }
             }
-            if (markAsRead && !suppressAutoRead && currentThreadId > 0L) {
+            if (markAsRead && currentThreadId > 0L) {
                 repository.markThreadRead(currentThreadId)
             }
             val hadMessages = _uiState.value.messages.isNotEmpty()
@@ -188,6 +182,13 @@ class ChatViewModel(
                         hasMoreOlder = page.size == MESSAGE_PAGE_SIZE,
                         error = null
                     )
+                    // The messages are now in hand (and keep their NEW marks in this state for as
+                    // long as the chat is open), so the badge may stop counting them.
+                    if (page.any { it.isNewSpam }) {
+                        page.firstOrNull { it.isNewSpam }?.address?.let { address ->
+                            repository.markNewSpamSeen(address)
+                        }
+                    }
                     if (initialMessageId != null) {
                         loadUntilMessageVisible(initialMessageId)
                     }
@@ -502,36 +503,6 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * Flips this conversation between read and unread.
-     *
-     * The read marker in the action strip has to do something visible in both directions: on a
-     * conversation that has no unread messages, "mark as read" is a no-op, which is exactly how it
-     * looked broken. Textra's double-check toggles, and so does this.
-     */
-    fun toggleConversationRead(onMarkedRead: (Boolean) -> Unit = {}) {
-        val threadId = _uiState.value.threadId
-        if (threadId <= 0L) return
-        val hasUnread = _uiState.value.messages.any { it.isInbox && !it.read }
-        // Marking the conversation unread would be undone at once: opening a chat reloads it and
-        // that reload marks everything read. This keeps the state the user just asked for.
-        suppressAutoRead = !hasUnread
-        viewModelScope.launch {
-            if (hasUnread) {
-                repository.markThreadRead(threadId)
-            } else {
-                repository.markThreadUnread(threadId)
-            }
-            // Reflect it locally too, so the strip and the row change without a reload.
-            _uiState.value = _uiState.value.copy(
-                messages = _uiState.value.messages.map { message ->
-                    if (message.isInbox) message.copy(read = hasUnread) else message
-                }
-            )
-            onMarkedRead(hasUnread)
-        }
-    }
-
     /** Clears the unread badge of this conversation; used by the swipe-to-mark-read action. */
     fun markConversationRead() {
         val threadId = _uiState.value.threadId
@@ -545,6 +516,26 @@ class ChatViewModel(
         selectedMessageIds.clear()
         selectedMessageIds.add(messageId)
         isSelectionMode = true
+    }
+
+    /** Selects every message currently loaded, for the "select all" entry in the selection bar. */
+    fun selectAllMessages() {
+        _uiState.value.messages.forEach { selectedMessageIds.add(it.id) }
+        isSelectionMode = selectedMessageIds.isNotEmpty()
+    }
+
+    /** The double check in the selection bar: marks the conversation read. */
+    fun markSelectedMessagesRead() {
+        val threadId = _uiState.value.threadId
+        viewModelScope.launch {
+            if (threadId > 0L) repository.markThreadRead(threadId)
+            _uiState.value = _uiState.value.copy(
+                messages = _uiState.value.messages.map { message ->
+                    if (message.isInbox) message.copy(read = true) else message
+                }
+            )
+            clearSelection()
+        }
     }
 
     fun toggleSelectMessage(messageId: Long) {

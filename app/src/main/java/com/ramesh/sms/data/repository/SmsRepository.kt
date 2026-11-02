@@ -604,7 +604,8 @@ class SmsRepository(
                             isRevealed = isRevealed,
                             status = status,
                             subId = subId,
-                            reaction = reactions[msgId]
+                            reaction = reactions[msgId],
+                            isNewSpam = isSpam && meta?.isNew == true
                         )
                     )
                 }
