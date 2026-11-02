@@ -57,7 +57,15 @@ fun countableThreadsForTab(
 fun badgeCountForTab(threads: List<ConversationThread>, tab: SenderTab?): Int =
     countableThreadsForTab(threads, tab).sumOf { it.unreadCount + it.newSpamCount }
 
-/** Threads the inbox would actually show for [tab]; a null tab means the "All" pseudo tab. */
+/**
+ * Threads the inbox would actually show for [tab]; a null tab means the "All" pseudo tab.
+ *
+ * "All" now keeps spam-only conversations too. Leaving them out made the inbox disagree with its own
+ * badge - the number counted a spam arrival that no row ever showed - and a message the user could
+ * see in the notification shade looked missing from the list. They arrive flagged (the row carries a
+ * spam chip), so nothing is hidden silently. A custom tab still drops them: there they would be an
+ * empty row inside a filter that says "not spam".
+ */
 fun visibleThreadsForTab(
     threads: List<ConversationThread>,
     tab: SenderTab?
@@ -65,7 +73,7 @@ fun visibleThreadsForTab(
     return threads.filter { thread ->
         if (thread.messageCount <= 0) return@filter false
         if (tab == null) {
-            !thread.spamOnly
+            true
         } else {
             (tab.spamOnly || !thread.spamOnly) && threadMatchesTab(thread, tab)
         }

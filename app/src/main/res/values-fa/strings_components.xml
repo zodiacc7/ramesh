@@ -44,4 +44,7 @@
     <string name="chat_delete_messages_title">پیام‌ها حذف شوند؟</string>
     <string name="chat_delete_messages_body">آیا از حذف %1$d پیام انتخاب‌شده مطمئن هستید؟ این کار قابل بازگشت نیست.</string>
     <string name="chat_react_action">واکنش</string>
+    <string name="comp_reveal">نمایش</string>
+    <string name="comp_hide">پنهان</string>
+    <string name="inbox_spam_with_new">اسپم %1$d</string>
 </resources>

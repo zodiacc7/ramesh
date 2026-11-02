@@ -11,7 +11,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState as animateFloat
 import androidx.compose.animation.core.spring
@@ -25,10 +24,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,21 +48,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -71,7 +71,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -81,6 +80,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -91,51 +91,54 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.abs
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import com.ramesh.sms.ChatNav
 import com.ramesh.sms.R
 import com.ramesh.sms.data.model.ConversationThread
-import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.data.model.SearchMessageResult
-import androidx.compose.ui.semantics.Role
 import com.ramesh.sms.data.model.SenderTab
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.receiver.SmsReceiver
 import com.ramesh.sms.theme.AppearanceStore
 import com.ramesh.sms.theme.PillShape
+import com.ramesh.sms.theme.SpamWarningBorderDark
+import com.ramesh.sms.theme.SpamWarningBorderLight
+import com.ramesh.sms.theme.SpamWarningDark
+import com.ramesh.sms.theme.SpamWarningLight
+import com.ramesh.sms.theme.SpamWarningOnDark
+import com.ramesh.sms.theme.SpamWarningOnLight
 import com.ramesh.sms.theme.SquircleCardShape
 import com.ramesh.sms.ui.components.AddToTabDialog
 import com.ramesh.sms.ui.components.ContactProfileDialog
@@ -149,12 +152,15 @@ import com.ramesh.sms.ui.components.SimFilterRow
 import com.ramesh.sms.ui.components.TabEditorDialog
 import com.ramesh.sms.ui.components.TabOptionsSheet
 import com.ramesh.sms.ui.util.SmsDateFormats
-import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.util.contentAware
+import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.viewmodel.ConversationsViewModel
 import com.ramesh.sms.ui.viewmodel.UNDO_DELETE_WINDOW_MILLIS
 import com.ramesh.sms.util.DefaultSmsAppHelper
 import java.util.Locale
+import kotlin.math.abs
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val ListBottomFabPadding = 88.dp
 private val AvatarDividerInset = 78.dp
@@ -649,7 +655,12 @@ fun ConversationsScreen(
                                                 ChatNav(
                                                     threadId = thread.threadId,
                                                     address = thread.address,
-                                                    contactName = thread.contactName
+                                                    contactName = thread.contactName,
+                                                    // A spam row opens on the message that was
+                                                    // filtered and highlights it, instead of
+                                                    // dropping the user at the bottom of the thread
+                                                    // to find it themselves.
+                                                    initialMessageId = thread.newestSpamMessageId
                                                 )
                                             )
                                         },
@@ -1288,7 +1299,8 @@ private fun ConversationsInboxList(
                                 ChatNav(
                                     threadId = thread.threadId,
                                     address = thread.address,
-                                    contactName = thread.contactName
+                                    contactName = thread.contactName,
+                                    initialMessageId = thread.newestSpamMessageId
                                 )
                             )
                         }
@@ -1389,13 +1401,28 @@ private fun ConversationItem(
     val dateText = remember(thread.date, useShamsi, appLanguage) {
         SmsDateFormats.conversationList(thread.date, useShamsi, appLanguage)
     }
-    val isLastReceivedSpam = thread.isLastReceivedSpam
+    // A row is "spam" when the newest received message was filtered, or when the whole conversation
+    // is spam. Both cases print a chip: before, the only marker was a 46% alpha that just made the
+    // row look broken, and the chip appeared only while the spam was still unread - so the moment
+    // you opened the spam tab, nothing told you which conversations those were.
+    val showsSpam = thread.hasSpam || thread.isLastReceivedSpam || thread.spamOnly
+    val isDark = isSystemInDarkTheme()
+    val spamRowTint = if (isDark) {
+        SpamWarningDark.copy(alpha = 0.55f)
+    } else {
+        SpamWarningLight.copy(alpha = 0.9f)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isLastReceivedSpam) 0.46f else 1f)
-            .background(itemBgColor)
+            .background(
+                when {
+                    isSelected -> itemBgColor
+                    showsSpam -> spamRowTint
+                    else -> itemBgColor
+                }
+            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -1517,38 +1544,73 @@ private fun ConversationItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (thread.unreadCount > 0 && !isSelectionMode) {
+                // The spam chip is the answer to "the tab badge says 3, which message is it?":
+                // every spam row carries it, and it shows how many filtered messages are still
+                // unread, so the number in the badge can be traced to rows here.
+                if (showsSpam && !isSelectionMode) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    if (thread.isUnreadSpam) {
-                        Surface(
-                            shape = PillShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                        ) {
-                            Text(
-                                text = stringResource(R.string.comp_spam),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontSize = 10.sp
-                            )
-                        }
-                    } else {
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ) {
-                            Text(
-                                text = thread.unreadCount.toString(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 2.dp)
-                            )
-                        }
+                    SpamChip(newCount = thread.newSpamCount)
+                }
+
+                if (thread.unreadCount > 0 && !isSelectionMode && !thread.isUnreadSpam) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Text(
+                            text = thread.unreadCount.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The spam marker on an inbox row.
+ *
+ * A shield and the word "Spam" are always drawn for a spam conversation, so the rows in a spam tab
+ * can be recognised at a glance; [newCount] adds the number of filtered messages nobody has looked
+ * at yet, which is exactly what the tab badge counts.
+ */
+@Composable
+private fun SpamChip(newCount: Int) {
+    val isDark = isSystemInDarkTheme()
+    val content = if (isDark) SpamWarningOnDark else SpamWarningOnLight
+    val border = if (isDark) SpamWarningBorderDark else SpamWarningBorderLight
+    Surface(
+        shape = PillShape,
+        color = content.copy(alpha = if (isDark) 0.22f else 0.12f),
+        border = BorderStroke(0.5.dp, border.copy(alpha = 0.7f))
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = null,
+                tint = content,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = if (newCount > 0) {
+                    stringResource(R.string.inbox_spam_with_new, newCount)
+                } else {
+                    stringResource(R.string.comp_spam)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = content,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
         }
     }
 }

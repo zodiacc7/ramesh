@@ -195,7 +195,11 @@ fun SpamMessagePill(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isRevealed) "Hide" else "Reveal",
+                        text = if (isRevealed) {
+                            stringResource(R.string.comp_hide)
+                        } else {
+                            stringResource(R.string.comp_reveal)
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )

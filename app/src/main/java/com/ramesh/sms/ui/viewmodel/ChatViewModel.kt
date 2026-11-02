@@ -151,6 +151,12 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Set while the user has explicitly marked this conversation unread, so the next reload does
+     * not silently mark it read again.
+     */
+    private var suppressAutoRead = false
+
     fun loadMessages(markAsRead: Boolean = isScreenResumed) {
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
@@ -162,7 +168,7 @@ class ChatViewModel(
                     _uiState.value = _uiState.value.copy(threadId = resolvedId)
                 }
             }
-            if (markAsRead && currentThreadId > 0L) {
+            if (markAsRead && !suppressAutoRead && currentThreadId > 0L) {
                 repository.markThreadRead(currentThreadId)
             }
             val hadMessages = _uiState.value.messages.isNotEmpty()
@@ -503,17 +509,26 @@ class ChatViewModel(
      * conversation that has no unread messages, "mark as read" is a no-op, which is exactly how it
      * looked broken. Textra's double-check toggles, and so does this.
      */
-    fun toggleConversationRead() {
+    fun toggleConversationRead(onMarkedRead: (Boolean) -> Unit = {}) {
         val threadId = _uiState.value.threadId
         if (threadId <= 0L) return
         val hasUnread = _uiState.value.messages.any { it.isInbox && !it.read }
+        // Marking the conversation unread would be undone at once: opening a chat reloads it and
+        // that reload marks everything read. This keeps the state the user just asked for.
+        suppressAutoRead = !hasUnread
         viewModelScope.launch {
             if (hasUnread) {
                 repository.markThreadRead(threadId)
             } else {
                 repository.markThreadUnread(threadId)
             }
-            loadMessages()
+            // Reflect it locally too, so the strip and the row change without a reload.
+            _uiState.value = _uiState.value.copy(
+                messages = _uiState.value.messages.map { message ->
+                    if (message.isInbox) message.copy(read = hasUnread) else message
+                }
+            )
+            onMarkedRead(hasUnread)
         }
     }
 

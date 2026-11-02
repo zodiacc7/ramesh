@@ -233,6 +233,11 @@ class SmsRepository(
                         spamOnly = threadId in spamOnly,
                         isUnreadSpam = isUnreadSpam,
                         lastMessageAction = lastMessageAction,
+                        newestSpamMessageId = if (lastMessageAction == FilterAction.SPAM) {
+                            lastInbox?.messageId
+                        } else {
+                            null
+                        },
                         subId = threadSubIds[threadId] ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID,
                         photoUri = contactDetail?.photoUri,
                         contactLookupUri = contactDetail?.lookupUri

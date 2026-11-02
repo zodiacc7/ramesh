@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material3.AlertDialog
@@ -24,17 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,72 +210,4 @@ private fun DetailRow(label: String, value: String) {
             modifier = Modifier.weight(1f, fill = false)
         )
     }
-}
-
-/**
- * The message text, pre-selected and still editable as a selection.
- *
- * Copy used to end at the clipboard. A long message often needs only one line of it, so the same tap
- * also opens this: the whole body starts selected (a normal "copy" is one button away) and the
- * handles work from there to narrow it down. The body itself is read-only - [TextFieldValue] keeps
- * the text fixed while the selection moves.
- */
-@Composable
-fun SelectableMessageDialog(
-    text: String,
-    onCopy: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var value by remember(text) {
-        mutableStateOf(TextFieldValue(text, selection = TextRange(0, text.length)))
-    }
-    val selected = text.substring(
-        value.selection.min.coerceIn(0, text.length),
-        value.selection.max.coerceIn(0, text.length)
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = SquircleCardShape,
-        title = {
-            Text(
-                text = stringResource(R.string.chat_copy_text_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                BasicTextField(
-                    value = value,
-                    onValueChange = { next -> value = next.copy(text = text) },
-                    readOnly = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.merge(
-                        TextStyle(color = MaterialTheme.colorScheme.onSurface)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onCopy(selected.ifEmpty { text })
-                    onDismiss()
-                }
-            ) {
-                Text(stringResource(R.string.chat_copy_selection))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chat_cancel))
-            }
-        }
-    )
 }
