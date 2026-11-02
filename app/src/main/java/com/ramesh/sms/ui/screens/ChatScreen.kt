@@ -1,3 +1,4 @@
+package com.ramesh.sms.ui.screens
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -144,7 +145,6 @@ import com.ramesh.sms.ui.util.contentAware
 import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
-package com.ramesh.sms.ui.screens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
