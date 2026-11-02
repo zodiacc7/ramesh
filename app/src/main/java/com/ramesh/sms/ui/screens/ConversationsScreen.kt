@@ -1,3 +1,4 @@
+package com.ramesh.sms.ui.screens
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -160,7 +161,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-package com.ramesh.sms.ui.screens
 
 private val ListBottomFabPadding = 88.dp
 private val AvatarDividerInset = 78.dp

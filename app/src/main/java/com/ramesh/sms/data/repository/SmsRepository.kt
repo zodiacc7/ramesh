@@ -839,36 +839,6 @@ class SmsRepository(
         }
     }
 
-    /**
-     * Puts a conversation back in the unread state, the counterpart of [markThreadRead].
-     *
-     * Only received messages are touched: a sent message has no unread notion, and the inbox counts
-     * unread incoming messages when it draws the badge.
-     */
-    suspend fun markThreadUnread(threadId: Long) = withContext(Dispatchers.IO) {
-        if (threadId <= 0L) return@withContext
-        val values = ContentValues().apply {
-            put(Telephony.Sms.READ, 0)
-            put(Telephony.Sms.SEEN, 0)
-        }
-        val incomingOnly = "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.TYPE} = ?"
-        val args = arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
-        try {
-            context.contentResolver.update(Telephony.Sms.CONTENT_URI, values, incomingOnly, args)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to mark conversation unread $threadId", e)
-        }
-        try {
-            val convUri = ContentUris.withAppendedId(
-                Telephony.MmsSms.CONTENT_CONVERSATIONS_URI,
-                threadId
-            )
-            context.contentResolver.update(convUri, values, null, null)
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not update the conversation row for $threadId", e)
-        }
-    }
-
     suspend fun markAllMessagesRead() = withContext(Dispatchers.IO) {
         try {
             context.contentResolver.update(
