@@ -174,7 +174,7 @@ class SenderTabTest {
 
     @Test
     fun aCustomTabStillDropsSpamOnlyConversations() {
-        val spamOnly = unreadThread(1L, "09120000000", spamOnly = true)
+        val spamOnly = unreadThread(1L, "09120000000", newSpamCount = 1, spamOnly = true)
         val tab = SenderTab(
             id = 1L,
             name = "Everything",
