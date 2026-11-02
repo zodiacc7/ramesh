@@ -18,22 +18,12 @@
     <string name="chat_sending_in">ارسال در %1$d ثانیه</string>
     <string name="chat_sms_message">پیامک</string>
     <string name="chat_composer_hint">پیام متنی (SMS)…</string>
-    <string name="chat_menu_more">بیشتر</string>
     <string name="chat_menu_share">اشتراک‌گذاری</string>
     <string name="chat_menu_forward">بازفرست</string>
     <string name="chat_menu_forward_title">بازفرست به</string>
     <string name="chat_menu_forward_empty">هنوز گفتگویی برای بازفرست نیست</string>
     <string name="chat_menu_forward_sent">بازفرست شد</string>
     <string name="chat_menu_forward_failed">بازفرست پیام نشد</string>
-    <string name="chat_menu_select">انتخاب</string>
-    <string name="chat_menu_report_spam">گزارش اسپم</string>
     <string name="chat_menu_otp">کد %1$s</string>
     <string name="chat_menu_otp_copy">کپی کد</string>
-    <string name="chat_menu_report_title">گزارش اسپم</string>
-    <string name="chat_menu_report_body">رامش این پیام را به شمارهٔ گزارش اسپم اپراتور شما می‌فرستد و شماره را برای بار بعد نگه می‌دارد. شمارهٔ گزارش در اپراتورهای ایران متفاوت است، پس پیش از ذخیره مطمئن شوید.</string>
-    <string name="chat_menu_report_number">شمارهٔ گزارش</string>
-    <string name="chat_menu_report_send">ارسال گزارش</string>
-    <string name="chat_menu_report_sent">گزارش ارسال شد</string>
-    <string name="chat_menu_report_failed">ارسال گزارش نشد</string>
-    <string name="chat_menu_date_toggle">برای تغییر تقویم روی تاریخِ داخل پیام بزنید</string>
-</resources>
+    <string name="chat_mark_read">علامت‌گذاری به‌عنوان خوانده‌شده</string></resources>

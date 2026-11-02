@@ -83,23 +83,27 @@ Three rules keep that path honest:
 always wins over a stored verdict (`resolveInboxAction`), and editing a rule or a sender preference
 drops the affected verdicts so the next read re-evaluates.
 
-## The bubble mini-menu
+## The message action bar
 
-A single tap on a bubble opens `MessageMiniMenu` - copy, forward, and a "more" grid with share,
-react, info, select and report-spam. Holding a message still enters selection mode, so the two
-gestures never compete. The message text stays inside a `SelectionContainer` in the menu, which is
-how a *part* of a long message is copied: selecting inside the list would fight the scrolling and
-the tap gesture.
+A single tap on a bubble opens `MessageActionBar`: one horizontal strip floating over the top of the
+chat - the Textra layout - carrying copy, react, share, forward, delete, info and mark-as-read in a
+single row. Nothing hides behind a "More" submenu, so every action is one tap away, and the strip
+sits above the message rather than over it, so the bubble it acts on stays readable. Copy is the one
+action with a text label; the rest lean on their icons and on the content description read by
+TalkBack. When a verification code was detected, `findOtpHighlight` provides a chip on the left of
+the strip that copies the code itself.
 
-What is tappable in that text is decided by `MessageLinkScanner`, a pure function with its own unit
-tests. URLs are collected first and their ranges are excluded from the phone and date passes, so
-`https://example.com/1404/03/23` is one link and not a link plus a date. The same file exposes
-`findOtpHighlight`, which turns the code `OtpDetector` found into a range the menu can highlight and
-copy on its own.
+Holding a message still enters selection mode, so the two gestures never compete. Full-text
+selection lives in the long-press "Message options" dialog, which keeps the body in a
+`SelectionContainer` - that is how a *part* of a long message is copied, since selecting inside the
+list would fight the scrolling and the tap gesture.
 
-"Report spam" has no default number: `7726` is the British/American short code, Iranian operators
-publish their own, so `AppPreferences.spamReportNumber` starts empty and the confirmation dialog asks
-for it once.
+What is tappable in a message body is decided by `MessageLinkScanner`, a pure function with its own
+unit tests. URLs are collected first and their ranges are excluded from the phone and date passes,
+so `https://example.com/1404/03/23` is one link and not a link plus a date.
+
+The strip is stateless: every action arrives as a lambda, so it holds no view-model or repository
+reference and can be reasoned about, and previewed, on its own.
 
 ## Dates and calendars
 
@@ -110,6 +114,20 @@ disagree about the calendar any more (they did: the list only looked at the scop
 
 `AppLanguage.isPersian()` resolves `SYSTEM` against the device locale. Date formatting used to
 compare against `PERSIAN` directly, so a Persian phone on "System default" was formatted as English.
+
+Only the digits and month names follow the language; the *calendar* is a separate decision.
+
+`SmsDateFormats` builds its `DateTimeFormatter`s **per locale**, in a
+`ConcurrentHashMap<Locale, Formats>`, from `localeFor(appLanguage)`: Persian always maps to
+`fa-IR`, English to `en`, and `SYSTEM` to the device locale. Before this, the formatters were built
+once at class-load time with `Locale.getDefault()` - the *device* language - so an English phone
+running the Persian UI got English weekday and month names. The damage looked random because
+`conversationList` picks a different pattern per row age: `HH:mm` for today, `EEE` for this week,
+`MMM d`/Jalali names beyond. One list could therefore show `۱۹:۳۳` next to `Sep 14`, and which rows
+disagreed depended on how old each message was - the reason the tabs appeared to use different
+formats. Every entry point now takes `appLanguage`, and the `remember` keys in `MessageBubble`,
+`SpamMessagePill` and the inbox rows include it, so a language change repaints instead of reusing a
+stale string.
 
 ## Storage
 

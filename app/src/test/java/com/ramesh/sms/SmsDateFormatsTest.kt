@@ -65,6 +65,14 @@ class SmsDateFormatsTest {
         val shamsi = SmsDateFormats.formatDate(timestamp, useShamsi = true, appLanguage = AppLanguage.PERSIAN, now = now)
 
         assertEquals("۲۲ شهریور", shamsi)
-        assertTrue(gregorian.contains("13") || gregorian.contains("Sep"))
+        // Gregorian mode still follows the app language: a Persian UI shows the Gregorian calendar
+        // with Persian month names and Persian digits ("۲۳ سپتامبر"), not an English string sitting
+        // next to Persian rows. Only the *calendar* differs between the two, not the script.
+        org.junit.Assert.assertNotEquals(shamsi, gregorian)
+        assertTrue("expected Persian digits, got \"$gregorian\"", gregorian.any { it in '۰'..'۹' })
+        assertTrue(
+            "expected no Latin letters, got \"$gregorian\"",
+            gregorian.none { it in 'A'..'Z' || it in 'a'..'z' }
+        )
     }
 }

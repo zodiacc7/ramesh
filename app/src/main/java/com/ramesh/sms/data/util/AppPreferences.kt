@@ -36,13 +36,6 @@ interface UserPreferences {
     /** Whether the Jalali calendar is used only inside chats or everywhere in the app. */
     var jalaliScope: JalaliScope
 
-    /**
-     * The number the "report spam" action sends to.
-     *
-     * Empty by default on purpose: there is no universal short code. `7726` is the British and
-     * American one, while Iranian operators publish their own, so the user provides it once.
-     */
-    var spamReportNumber: String
 }
 
 class AppPreferences(
@@ -143,12 +136,6 @@ class AppPreferences(
             prefs.edit().putString(KEY_JALALI_SCOPE, value.name).apply()
         }
 
-    override var spamReportNumber: String
-        get() = prefs.getString(KEY_SPAM_REPORT_NUMBER, "").orEmpty()
-        set(value) {
-            prefs.edit().putString(KEY_SPAM_REPORT_NUMBER, value.trim()).apply()
-        }
-
     companion object {
         const val PREFS_NAME = "ramesh_preferences"
         const val KEY_SHOW_CONTACTS_ONLY = "show_contacts_only"
@@ -166,6 +153,5 @@ class AppPreferences(
         const val KEY_APP_LANGUAGE = "app_language"
         const val KEY_SHOW_SIM_BADGE = "show_sim_badge"
         const val KEY_JALALI_SCOPE = "jalali_scope"
-        const val KEY_SPAM_REPORT_NUMBER = "spam_report_number"
     }
 }

@@ -33,7 +33,7 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 | Dates disagreed between screens and tabs | the inbox decided its calendar with `jalaliScope == EVERYWHERE`, while the chat screen also honoured the `showShamsiDate` flag that tapping a date toggles | `showsJalaliDates(scope, flag)` is the single rule; the inbox state carries `useShamsiInLists`, resolved once |
 | A Persian phone on "System default" got English dates | formatting compared `appLanguage == PERSIAN`, so `SYSTEM` always fell through to English | `AppLanguage.isPersian()` resolves `SYSTEM` against the device locale |
 | Search results mixed Latin and Persian digits | the search row never received `appLanguage` and fell back to the device locale | the language is passed explicitly |
-| A tap on a message did nothing | the tap was consumed by the selectable text and the menu it should open did not exist | `MessageMiniMenu`: copy, forward, share, react, info, select, report spam, an OTP chip and live links |
+| A tap on a message did nothing | the tap was consumed by the selectable text and the menu it should open did not exist | `MessageActionBar`: one horizontal strip - copy, react, share, forward, delete, info, mark-as-read - plus an OTP chip, with full-text selection moved to the long-press dialog |
 
 
 

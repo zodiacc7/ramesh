@@ -57,4 +57,40 @@ class DateCalendarTest {
         assertEquals(first, second)
         assertTrue("Persian UI should use Persian digits", first.any { it in '۰'..'۹' })
     }
+
+    @Test
+    fun `the formatters follow the app language, not the device`() {
+        val persianOnAnEnglishPhone = SmsDateFormats.localeFor(AppLanguage.PERSIAN, Locale.US)
+        assertEquals("fa", persianOnAnEnglishPhone.language)
+        assertEquals("IR", persianOnAnEnglishPhone.country)
+
+        assertEquals(Locale.ENGLISH, SmsDateFormats.localeFor(AppLanguage.ENGLISH, Locale("fa", "IR")))
+        assertEquals(Locale.US, SmsDateFormats.localeFor(AppLanguage.SYSTEM, Locale.US))
+    }
+
+    @Test
+    fun `every inbox row of a persian ui is persian, whatever its age`() {
+        val now = 1_700_000_000_000L
+        // Ages that take the three different branches of conversationList: clock, weekday, full date.
+        val ages = listOf(10 * 60 * 1000L, 3L * 24 * 60 * 60 * 1000, 40L * 24 * 60 * 60 * 1000)
+
+        ages.forEach { age ->
+            val text = SmsDateFormats.conversationList(now - age, true, AppLanguage.PERSIAN, now)
+            assertTrue(
+                "expected Persian only, got \"$text\"",
+                text.none { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' }
+            )
+        }
+    }
+
+    @Test
+    fun `an english ui never leaks persian digits into the inbox`() {
+        val now = 1_700_000_000_000L
+        val ages = listOf(10 * 60 * 1000L, 3L * 24 * 60 * 60 * 1000, 40L * 24 * 60 * 60 * 1000)
+
+        ages.forEach { age ->
+            val text = SmsDateFormats.conversationList(now - age, true, AppLanguage.ENGLISH, now)
+            assertTrue("expected Latin digits in \"$text\"", text.none { it in '۰'..'۹' })
+        }
+    }
 }

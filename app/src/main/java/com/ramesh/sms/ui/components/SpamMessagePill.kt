@@ -96,7 +96,9 @@ fun SpamMessagePill(
     val dateText = remember(message.date, useShamsi, appLanguage) {
         SmsDateFormats.formatDate(message.date, useShamsi, appLanguage)
     }
-    val clockText = remember(message.date) { SmsDateFormats.clock(message.date) }
+    val clockText = remember(message.date, appLanguage) {
+        SmsDateFormats.clock(message.date, appLanguage)
+    }
 
     Card(
         modifier = modifier

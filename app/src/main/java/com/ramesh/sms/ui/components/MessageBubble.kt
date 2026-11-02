@@ -58,8 +58,8 @@ fun MessageBubble(
     message: SmsMessage,
     onLongClick: () -> Unit,
     /**
-     * A single tap on the bubble. Opens the mini-menu (copy / forward / more); a long press still
-     * selects the message, exactly as before.
+     * A single tap on the bubble. Opens the action strip (copy / react / share / forward / delete /
+     * info / mark as read); a long press still selects the message, exactly as before.
      */
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -96,7 +96,9 @@ fun MessageBubble(
     val dateText = remember(message.date, useShamsi, appLanguage) {
         SmsDateFormats.formatDate(message.date, useShamsi, appLanguage)
     }
-    val timeText = remember(message.date) { SmsDateFormats.clock(message.date) }
+    val timeText = remember(message.date, appLanguage) {
+        SmsDateFormats.clock(message.date, appLanguage)
+    }
     // Keep long messages from touching both edges, like every modern messenger.
     val context = LocalContext.current
     val maxBubbleWidth = remember(context) {
