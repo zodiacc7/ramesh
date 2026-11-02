@@ -56,20 +56,25 @@ object MessageLinkScanner {
 
     fun scan(body: String): List<MessageSpan> {
         if (body.isBlank()) return emptyList()
+        // Persian and Arabic digits are folded to Latin *before* matching, one character for one
+        // character, so every index found here still points at the same place in the original body.
+        // Without this a number typed on a Persian keyboard ("۰۹۱۲ …") was invisible to the patterns
+        // while a card number in Latin digits was not.
+        val searchable = toLatinDigits(body)
         val claimed = ArrayList<IntRange>(8)
         val spans = ArrayList<MessageSpan>(4)
 
-        for (match in URL.findAll(body)) {
+        for (match in URL.findAll(searchable)) {
             var end = match.range.last + 1
-            while (end > match.range.first && body[end - 1] in TRAILING_PUNCTUATION) end--
+            while (end > match.range.first && searchable[end - 1] in TRAILING_PUNCTUATION) end--
             if (end - match.range.first < 8) continue
-            val raw = body.substring(match.range.first, end)
+            val raw = searchable.substring(match.range.first, end)
             val value = if (raw.startsWith("www.", ignoreCase = true)) "https://$raw" else raw
             spans.add(MessageSpan(match.range.first, end, MessageSpan.Kind.URL, value))
             claimed.add(match.range.first until end)
         }
 
-        for (match in PHONE.findAll(body)) {
+        for (match in PHONE.findAll(searchable)) {
             if (claimed.any { overlaps(it, match.range) }) continue
             if (match.value.count { it.isDigit() } !in 7..15) continue
             spans.add(
@@ -82,11 +87,16 @@ object MessageLinkScanner {
             )
         }
 
-        for (match in DATE.findAll(body)) {
+        for (match in DATE.findAll(searchable)) {
             if (claimed.any { overlaps(it, match.range) }) continue
             if (spans.any { it.kind == MessageSpan.Kind.PHONE && overlaps(it, match.range) }) continue
             spans.add(
-                MessageSpan(match.range.first, match.range.last + 1, MessageSpan.Kind.DATE, match.value)
+                MessageSpan(
+                    start = match.range.first,
+                    end = match.range.last + 1,
+                    kind = MessageSpan.Kind.DATE,
+                    value = match.value
+                )
             )
         }
 
@@ -103,6 +113,21 @@ object MessageLinkScanner {
                 ch == '+' && index == 0 -> builder.append('+')
             }
         }
+        return builder.toString()
+    }
+
+    /** Same-length copy of [text] with Persian and Arabic digits replaced by Latin ones. */
+    private fun toLatinDigits(text: String): String {
+        var needsWork = false
+        for (ch in text) {
+            if (ch in PERSIAN_ZERO..'\u06F9' || ch in ARABIC_ZERO..'\u0669') {
+                needsWork = true
+                break
+            }
+        }
+        if (!needsWork) return text
+        val builder = StringBuilder(text.length)
+        for (ch in text) builder.append(toLatinDigit(ch))
         return builder.toString()
     }
 
