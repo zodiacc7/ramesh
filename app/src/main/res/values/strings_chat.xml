@@ -26,4 +26,17 @@
     <string name="chat_menu_forward_failed">Could not forward the message</string>
     <string name="chat_menu_otp">Code %1$s</string>
     <string name="chat_menu_otp_copy">Copy code</string>
-    <string name="chat_mark_read">Mark as read</string></resources>
+    <string name="chat_mark_read">Mark as read</string>    <string name="chat_delete_confirm">Tap again to delete</string>
+    <string name="chat_mark_unread">Mark as unread</string>
+    <string name="chat_copy_text_title">Copy text</string>
+    <string name="chat_copy_selection">Copy selection</string>
+    <string name="chat_details_title">Message details</string>
+    <string name="chat_details_type">Type</string>
+    <string name="chat_details_type_sms">SMS</string>
+    <string name="chat_details_sim_slot">SIM slot</string>
+    <string name="chat_details_sim_name">SIM name</string>
+    <string name="chat_details_to">To</string>
+    <string name="chat_details_sent">Sent</string>
+    <string name="chat_details_delivered">Delivered</string>
+    <string name="chat_details_unknown">—</string>
+</resources>

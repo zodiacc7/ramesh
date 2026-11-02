@@ -496,6 +496,27 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Flips this conversation between read and unread.
+     *
+     * The read marker in the action strip has to do something visible in both directions: on a
+     * conversation that has no unread messages, "mark as read" is a no-op, which is exactly how it
+     * looked broken. Textra's double-check toggles, and so does this.
+     */
+    fun toggleConversationRead() {
+        val threadId = _uiState.value.threadId
+        if (threadId <= 0L) return
+        val hasUnread = _uiState.value.messages.any { it.isInbox && !it.read }
+        viewModelScope.launch {
+            if (hasUnread) {
+                repository.markThreadRead(threadId)
+            } else {
+                repository.markThreadUnread(threadId)
+            }
+            loadMessages()
+        }
+    }
+
     /** Clears the unread badge of this conversation; used by the swipe-to-mark-read action. */
     fun markConversationRead() {
         val threadId = _uiState.value.threadId
