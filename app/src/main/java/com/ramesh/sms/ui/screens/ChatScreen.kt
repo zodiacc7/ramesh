@@ -109,6 +109,7 @@ import com.ramesh.sms.data.model.SimInfo
 import com.ramesh.sms.data.util.AppLanguage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.data.util.foldSmsReactions
 import com.ramesh.sms.R
@@ -121,7 +122,10 @@ import com.ramesh.sms.ui.components.ChatBackdropBackground
 import com.ramesh.sms.ui.components.ChatDateHeader
 import com.ramesh.sms.ui.components.ContactProfileDialog
 import com.ramesh.sms.ui.components.ConversationAvatar
+import com.ramesh.sms.ui.components.ForwardMessageDialog
 import com.ramesh.sms.ui.components.MessageBubble
+import com.ramesh.sms.ui.components.MessageMiniMenu
+import com.ramesh.sms.ui.components.ReportSpamDialog
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
@@ -174,6 +178,12 @@ fun ChatScreen(
 
     val textToolbar = LocalTextToolbar.current
     var selectedMessageForDialog by remember { mutableStateOf<SmsMessage?>(null) }
+    // A single tap on a bubble opens the mini-menu; the rest is what that menu can start.
+    var miniMenuMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    var forwardBody by remember { mutableStateOf<String?>(null) }
+    var forwardTargets by remember { mutableStateOf<List<ConversationThread>>(emptyList()) }
+    var reportSpamBody by remember { mutableStateOf<String?>(null) }
+    var reportSpamNumber by remember { mutableStateOf("") }
     var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
     val selectedMessageIds = viewModel.selectedMessageIds
     val isSelectionMode = viewModel.isSelectionMode
@@ -712,6 +722,7 @@ fun ChatScreen(
                     isSelectionMode = isSelectionMode,
                     selectedMessageIds = selectedMessageIds,
                     onTapMessage = onTapMessage,
+                    onTapBubble = { message -> miniMenuMessage = message },
                     activeTextBubbleId = activeTextBubbleId,
                     selectionResetTick = selectionResetTick,
                     onBubbleTouched = { id -> activeTextBubbleId = id },
@@ -804,6 +815,89 @@ fun ChatScreen(
             },
             onCreateTab = { name ->
                 viewModel.createTabWithCurrentSender(name)
+            }
+        )
+    }
+
+    // Mini-menu: one tap on a bubble. Copy / forward / more, with the text selectable inside so a
+    // part of a long message can be copied without fighting the list's gestures.
+    miniMenuMessage?.let { message ->
+        MessageMiniMenu(
+            message = message,
+            useShamsi = state.showShamsiDate,
+            appLanguage = state.appLanguage,
+            onDismiss = { miniMenuMessage = null },
+            onCopy = { text ->
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText(context.getString(R.string.chat_sms_message), text)
+                )
+                Toast.makeText(context, context.getString(R.string.chat_copied), Toast.LENGTH_SHORT).show()
+            },
+            onForward = {
+                forwardBody = message.body
+                coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
+            },
+            onShare = {
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, message.body)
+                }
+                runCatching {
+                    context.startActivity(
+                        Intent.createChooser(share, context.getString(R.string.chat_menu_share))
+                    )
+                }
+            },
+            onInfo = { selectedMessageForDialog = message },
+            onReact = { reactionPickerMessageId = message.id },
+            onSelect = { viewModel.enterSelectionMode(message.id) },
+            onReportSpam = {
+                reportSpamBody = message.body
+                reportSpamNumber = viewModel.spamReportNumber()
+            },
+            onToggleDateFormat = if (state.enableDateTapShamsiToggle) {
+                { viewModel.toggleShamsiDate() }
+            } else {
+                null
+            }
+        )
+    }
+
+    forwardBody?.let { body ->
+        ForwardMessageDialog(
+            targets = forwardTargets,
+            onDismiss = { forwardBody = null },
+            onPick = { target ->
+                forwardBody = null
+                viewModel.forwardMessage(body, target.address) { result ->
+                    Toast.makeText(
+                        context,
+                        if (result.sent) {
+                            R.string.chat_menu_forward_sent
+                        } else {
+                            R.string.chat_menu_forward_failed
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
+    }
+
+    reportSpamBody?.let { body ->
+        ReportSpamDialog(
+            initialNumber = reportSpamNumber,
+            onDismiss = { reportSpamBody = null },
+            onSend = { number ->
+                reportSpamBody = null
+                viewModel.reportSpam(body, number) { result ->
+                    Toast.makeText(
+                        context,
+                        if (result.sent) R.string.chat_menu_report_sent else R.string.chat_menu_report_failed,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         )
     }
@@ -1027,6 +1121,8 @@ private fun ChatMessageList(
     isSelectionMode: Boolean = false,
     selectedMessageIds: Set<Long> = emptySet(),
     onTapMessage: (SmsMessage) -> Unit = {},
+    /** A single tap on a bubble, which opens the mini-menu. */
+    onTapBubble: (SmsMessage) -> Unit = {},
     activeTextBubbleId: Long? = null,
     selectionResetTick: Int = 0,
     onBubbleTouched: (Long) -> Unit = {},
@@ -1144,6 +1240,7 @@ private fun ChatMessageList(
                         appLanguage = appLanguage,
                         onToggleDateFormat = onDateTapAction,
                         onLongClick = { onLongClick(message) },
+                        onTap = { if (!isSelectionMode) onTapBubble(message) },
                         isSelectionMode = isSelectionMode,
                         isSelected = message.id in selectedMessageIds,
                         onToggleSelect = { onTapMessage(message) },

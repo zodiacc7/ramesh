@@ -21,13 +21,14 @@ import com.ramesh.sms.data.model.PreferredSimMode
 import com.ramesh.sms.data.model.RuleCategory
 import com.ramesh.sms.data.model.SenderPreference
 import com.ramesh.sms.data.model.SenderTab
+import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.model.SimInfo
 import com.ramesh.sms.data.model.SmsMessage
 import com.ramesh.sms.data.repository.SendSmsResult
 import com.ramesh.sms.data.repository.SmsRepository
 import com.ramesh.sms.data.util.AppLanguage
-import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.util.AppPreferences
+import com.ramesh.sms.data.util.showsJalaliDates
 import com.ramesh.sms.data.util.UserPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -95,8 +96,10 @@ class ChatViewModel(
             threadId = initialThreadId,
             address = initialAddress,
             contactName = initialContactName,
-            showShamsiDate = userPreferences.jalaliScope == JalaliScope.EVERYWHERE ||
-                userPreferences.showShamsiDate,
+            showShamsiDate = showsJalaliDates(
+                userPreferences.jalaliScope,
+                userPreferences.showShamsiDate
+            ),
             enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle,
             appLanguage = userPreferences.appLanguage,
         )
@@ -376,6 +379,39 @@ class ChatViewModel(
      * Queues an outgoing message. When the user configured a send delay, a visible countdown
      * runs first and [cancelPendingSend] aborts it; otherwise the SMS is dispatched at once.
      */
+    /** The cached conversations the "forward to" picker offers, minus this one. */
+    suspend fun forwardTargets(): List<ConversationThread> =
+        dbHelper.getCachedThreads().filter { it.threadId != initialThreadId }
+
+    /**
+     * Sends [body] to another conversation.
+     *
+     * A forward is a normal SMS, so it goes through the same repository call the composer uses. It
+     * deliberately skips the send-delay countdown: that delay exists so a message the user just
+     * typed can still be cancelled, not to slow down a deliberate forward.
+     */
+    fun forwardMessage(body: String, address: String, onComplete: (SendSmsResult) -> Unit = {}) {
+        viewModelScope.launch {
+            onComplete(repository.sendSms(address, body))
+        }
+    }
+
+    /** The saved operator report number, or an empty string when the user never set one. */
+    fun spamReportNumber(): String = userPreferences.spamReportNumber
+
+    /** Files a spam report for [body] at [number] and remembers the number for next time. */
+    fun reportSpam(body: String, number: String, onComplete: (SendSmsResult) -> Unit = {}) {
+        val target = number.trim()
+        if (target.isBlank()) {
+            onComplete(SendSmsResult(sent = false, storedInProvider = false))
+            return
+        }
+        userPreferences.spamReportNumber = target
+        viewModelScope.launch {
+            onComplete(repository.sendSms(target, body))
+        }
+    }
+
     fun sendMessage(text: String, onComplete: (SendSmsResult) -> Unit = {}) {
         if (text.isBlank()) return
         if (pendingSendJob?.isActive == true) return
@@ -585,8 +621,10 @@ class ChatViewModel(
         isScreenResumed = resumed
         if (resumed) {
             _uiState.value = _uiState.value.copy(
-                showShamsiDate = userPreferences.jalaliScope == JalaliScope.EVERYWHERE ||
-                userPreferences.showShamsiDate,
+                showShamsiDate = showsJalaliDates(
+                userPreferences.jalaliScope,
+                userPreferences.showShamsiDate
+            ),
                 enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle
             )
             loadContactDetails()

@@ -25,6 +25,7 @@ import com.ramesh.sms.data.repository.SmsRepository
 import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.data.util.AppPreferences
 import com.ramesh.sms.data.util.JalaliScope
+import com.ramesh.sms.data.util.showsJalaliDates
 import com.ramesh.sms.data.util.LockScreenPrivacy
 import com.ramesh.sms.data.util.PhoneNumberKeys
 import com.ramesh.sms.data.util.UserPreferences
@@ -67,6 +68,13 @@ data class ConversationsUiState(
     val showSimBadge: Boolean = true,
     /** Jalali calendar scope: inside chats only, or everywhere. */
     val jalaliScope: JalaliScope = JalaliScope.CHAT_ONLY,
+    /**
+     * Whether every conversation list draws Jalali dates.
+     *
+     * Resolved once from both calendar preferences, so the All tab, every custom tab and the search
+     * results can no longer disagree with each other or with the chat screen.
+     */
+    val useShamsiInLists: Boolean = false,
     /** Position of the "All" pseudo tab inside the tab strip. */
     val allTabIndex: Int = 0,
     /** Conversations waiting out the undo window before they are really deleted. */
@@ -115,7 +123,11 @@ class ConversationsViewModel(
             appLanguage = userPreferences.appLanguage,
             allTabIndex = userPreferences.allTabIndex,
             showSimBadge = userPreferences.showSimBadge,
-            jalaliScope = userPreferences.jalaliScope
+            jalaliScope = userPreferences.jalaliScope,
+            useShamsiInLists = showsJalaliDates(
+                userPreferences.jalaliScope,
+                userPreferences.showShamsiDate
+            )
         )
     )
     val uiState: StateFlow<ConversationsUiState> = _uiState.asStateFlow()
@@ -177,7 +189,11 @@ class ConversationsViewModel(
             appLanguage = userPreferences.appLanguage,
             allTabIndex = userPreferences.allTabIndex,
             showSimBadge = userPreferences.showSimBadge,
-            jalaliScope = userPreferences.jalaliScope
+            jalaliScope = userPreferences.jalaliScope,
+            useShamsiInLists = showsJalaliDates(
+                userPreferences.jalaliScope,
+                userPreferences.showShamsiDate
+            )
         )
         repository.invalidateLookupCaches()
         checkDefaultSmsStatus()
@@ -513,7 +529,10 @@ class ConversationsViewModel(
 
     fun setJalaliScope(scope: JalaliScope) {
         userPreferences.jalaliScope = scope
-        _uiState.value = _uiState.value.copy(jalaliScope = scope)
+        _uiState.value = _uiState.value.copy(
+            jalaliScope = scope,
+            useShamsiInLists = showsJalaliDates(scope, userPreferences.showShamsiDate)
+        )
     }
 
     fun setShowSimFilterEnabled(enabled: Boolean) {

@@ -26,7 +26,16 @@ data layer, the receivers, the Compose UI, the build and CI. Items are ordered b
 | 13 `onUpgrade` branches and two `onOpen` retries swallowed exceptions | `catch (e: Exception) {}` around every schema step | one `migrate(step)` helper logs the failing step name; a half-applied migration is now visible in logcat |
 | Nothing tested the repository, the inbox maths or the database | only pure helpers had tests | `InboxSnapshotTest`, `InboxActionEvaluatorTest` and the Robolectric-backed `RameshDatabaseHelperCacheTest` cover the read path |
 
-## Open — priority order
+## Fixed in 1.1.0 (pre-release)
+
+| Issue | Cause | Fix |
+| --- | --- | --- |
+| Dates disagreed between screens and tabs | the inbox decided its calendar with `jalaliScope == EVERYWHERE`, while the chat screen also honoured the `showShamsiDate` flag that tapping a date toggles | `showsJalaliDates(scope, flag)` is the single rule; the inbox state carries `useShamsiInLists`, resolved once |
+| A Persian phone on "System default" got English dates | formatting compared `appLanguage == PERSIAN`, so `SYSTEM` always fell through to English | `AppLanguage.isPersian()` resolves `SYSTEM` against the device locale |
+| Search results mixed Latin and Persian digits | the search row never received `appLanguage` and fell back to the device locale | the language is passed explicitly |
+| A tap on a message did nothing | the tap was consumed by the selectable text and the menu it should open did not exist | `MessageMiniMenu`: copy, forward, share, react, info, select, report spam, an OTP chip and live links |
+
+
 
 ### P1 — the leaked key still exists in history
 
