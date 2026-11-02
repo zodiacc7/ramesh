@@ -28,8 +28,9 @@ get through.
 **Latest stable: 1.0.0 (build 1000); 1.0.1 (build 1011) is a pre-release.** Release notes live on the
 [releases page](https://github.com/zodiacc7/ramesh/releases) and in
 [`fastlane/metadata/android/en-US/changelogs/`](fastlane/metadata/android/en-US/changelogs);
-design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the open audit in
-[docs/REVIEW.md](docs/REVIEW.md).
+design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the open audit in
+[docs/REVIEW.md](docs/REVIEW.md), and the feature comparison with Textra and Pulse SMS in
+[docs/FEATURES_ANALYSIS.md](docs/FEATURES_ANALYSIS.md).
 
 ### Highlights
 
@@ -246,8 +247,9 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 **آخرین نسخهٔ پایدار: ۱.۰.۰ (بیلد ۱۰۰۰)؛ نسخهٔ ۱.۰.۱ (بیلد ۱۰۱۱) پیش‌انتشار است.** یادداشت نسخه‌ها در
 [صفحهٔ ریلیزها](https://github.com/zodiacc7/ramesh/releases) و پوشهٔ
 [`fastlane/metadata/android/fa-IR/changelogs/`](fastlane/metadata/android/fa-IR/changelogs) است؛
-مستندهای طراحی در [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) و بازبینی در
-[docs/REVIEW.md](docs/REVIEW.md).
+مستندهای طراحی در [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)، بازبینی در
+[docs/REVIEW.md](docs/REVIEW.md) و مقایسهٔ قابلیت‌ها با Textra و Pulse SMS در
+[docs/FEATURES_ANALYSIS.md](docs/FEATURES_ANALYSIS.md) است.
 
 ### ویژگی‌ها
 
