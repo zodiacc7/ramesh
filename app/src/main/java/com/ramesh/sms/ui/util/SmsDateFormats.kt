@@ -152,7 +152,7 @@ object SmsDateFormats {
         val jDate = toJalali(messageDate.year, messageDate.monthValue, messageDate.dayOfMonth)
         val nowJDate = toJalali(currentDate.year, currentDate.monthValue, currentDate.dayOfMonth)
 
-        val isPersian = appLanguage == AppLanguage.PERSIAN
+        val isPersian = appLanguage.isPersian()
         val monthNames = if (isPersian) SHAMSI_MONTH_NAMES else SHAMSI_MONTH_NAMES_EN
         val monthName = monthNames.getOrElse(jDate.month - 1) { "" }
         val monthNum = String.format(Locale.US, "%02d", jDate.month)
@@ -198,7 +198,7 @@ object SmsDateFormats {
             val messageDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
             val jDate = toJalali(messageDate.year, messageDate.monthValue, messageDate.dayOfMonth)
             val timePart = clock(timestamp)
-            val isPersian = appLanguage == AppLanguage.PERSIAN
+            val isPersian = appLanguage.isPersian()
             // Long date: Persian keeps month names; English uses numeric YYYY/MM/DD
             val datePart = if (isPersian) {
                 val monthName = SHAMSI_MONTH_NAMES.getOrElse(jDate.month - 1) { "" }
@@ -236,7 +236,7 @@ object SmsDateFormats {
     ): String {
         val messageDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-        val isPersian = appLanguage == AppLanguage.PERSIAN
+        val isPersian = appLanguage.isPersian()
         val todayLabel = if (useShamsi && isPersian) "امروز" else "Today"
         val yesterdayLabel = if (useShamsi && isPersian) "دیروز" else "Yesterday"
         return when {
@@ -255,7 +255,7 @@ object SmsDateFormats {
         val diff = now - timestamp
         val oneDay = 24 * 60 * 60 * 1000L
         val local = Instant.ofEpochMilli(timestamp).atZone(zone)
-        val isPersian = appLanguage == AppLanguage.PERSIAN
+        val isPersian = appLanguage.isPersian()
         return when {
             diff < oneDay -> {
                 val text = local.toLocalTime().format(clock)

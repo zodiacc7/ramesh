@@ -4,7 +4,7 @@
 
 [English](#english) · [فارسی](#farsi)
 
-[![Version](https://img.shields.io/badge/version-1.0.1_(1011)-blue.svg)](https://github.com/zodiacc7/ramesh/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0_(1101)-blue.svg)](https://github.com/zodiacc7/ramesh/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3ddc84.svg)](https://developer.android.com/about/versions/oreo)
 
@@ -25,7 +25,7 @@ get through.
 > Ramesh is an independent app published under the `com.ramesh.sms` package id as a free
 > (GPL-3.0) open-source project.
 
-**Latest stable: 1.0.0 (build 1000); 1.0.1 (build 1011) is a pre-release.** Release notes live on the
+**Latest stable: 1.0.0 (build 1000); 1.1.0 (build 1101) is the current pre-release.** Release notes live on the
 [releases page](https://github.com/zodiacc7/ramesh/releases) and in
 [`fastlane/metadata/android/en-US/changelogs/`](fastlane/metadata/android/en-US/changelogs);
 design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the open audit in
@@ -53,6 +53,10 @@ design notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the open audit
   media decoding all happen on-device.
 - **RTL-aware.** Persian and Arabic message bodies render with the correct direction and
   punctuation even in the English UI, and dates can be shown in the Shamsi calendar.
+- **Tap a message to act on it.** A tap opens a small menu — copy, forward, or more (share, react,
+  info, select, report spam). The text stays selectable inside that menu, so you can copy part of a
+  long message; links, phone numbers and dates there open the browser, the dialer or the calendar,
+  and a verification code appears as a one-tap chip.
 - **Reactions that stay in place.** Long-press any message and drop an emoji reaction on it —
   stored locally and shown as a chip under the bubble. Reaction SMS that other clients send as
   text (`Reacted 👍 to "…"`) are recognised and folded onto the message they answer instead of
@@ -124,7 +128,7 @@ Then add the pattern in Filter Studio as a blocklist rule.
 
 1. Download the signed `ramesh-<version>-universal.apk` from
    [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) (latest stable: **1.0.0**, build 1000;
-   pre-release: **1.0.1**, build 1011).
+   pre-release: **1.1.0**, build 1101).
 2. Install it and open Ramesh.
 3. Grant SMS, contacts and notification permissions.
 4. Accept the prompt to become the default SMS app.
@@ -177,7 +181,7 @@ Requirements: **JDK 21** and the **Android SDK (API 36)**.
 
 ```bash
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew test               # unit tests (filter engine, inbox snapshot, database cache, OTP, dates, prefs)
+./gradlew test               # unit tests (filter engine, inbox snapshot, database cache, bubble links, OTP, dates, prefs)
 ./gradlew assembleRelease    # needs the signing environment variables below
 ```
 
@@ -244,7 +248,7 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 
 > رامش برنامه‌ای مستقل با شناسهٔ بستهٔ `com.ramesh.sms` و پروانهٔ آزاد GPL-3.0 است.
 
-**آخرین نسخهٔ پایدار: ۱.۰.۰ (بیلد ۱۰۰۰)؛ نسخهٔ ۱.۰.۱ (بیلد ۱۰۱۱) پیش‌انتشار است.** یادداشت نسخه‌ها در
+**آخرین نسخهٔ پایدار: ۱.۰.۰ (بیلد ۱۰۰۰)؛ نسخهٔ ۱.۱.۰ (بیلد ۱۱۰۱) پیش‌انتشار فعلی است.** یادداشت نسخه‌ها در
 [صفحهٔ ریلیزها](https://github.com/zodiacc7/ramesh/releases) و پوشهٔ
 [`fastlane/metadata/android/fa-IR/changelogs/`](fastlane/metadata/android/fa-IR/changelogs) است؛
 مستندهای طراحی در [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)، بازبینی در
@@ -272,6 +276,10 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
   کاملاً روی گوشی انجام می‌شود.
 - **پشتیبانی از راست‌به‌چپ.** متن فارسی و عربی با جهت و نشانه‌گذاری درست نمایش داده می‌شود و
   تاریخ‌ها را می‌توان شمسی دید.
+- **لمس پیام، منوی کارها.** با یک لمس روی هر پیام منوی کوچکی باز می‌شود: کپی، بازفرست و بیشتر
+  (اشتراک‌گذاری، واکنش، اطلاعات، انتخاب، گزارش اسپم). متن داخل همان منو قابل انتخاب می‌ماند، پس
+  می‌توانید بخشی از یک پیام بلند را کپی کنید؛ لینک، شمارهٔ تلفن و تاریخ همان‌جا مرورگر، تماس‌گیر یا
+  تقویم را باز می‌کنند و کد تأیید به‌صورت یک تراشهٔ یک‌لمسی نشان داده می‌شود.
 - **واکنش‌ها سر جای خودشان.** با نگه‌داشتن هر پیام می‌توانید به آن واکنش بدهید؛ واکنش‌ها روی
   گوشی ذخیره و زیر حباب نمایش داده می‌شوند. واکنش‌هایی که برنامه‌های دیگر به‌صورت متن می‌فرستند
   (`Reacted 👍 to "…"`) شناسایی و زیر همان پیام می‌نشینند، نه به‌شکل یک پیام جدا.
@@ -341,7 +349,7 @@ Licensed under the **GNU GPL v3** — see [LICENSE](LICENSE).
 
 ۱. فایل امضاشدهٔ `ramesh-<version>-universal.apk` را از
    [GitHub Releases](https://github.com/zodiacc7/ramesh/releases) دانلود کنید (آخرین نسخهٔ پایدار: **۱.۰.۰**،
-   بیلد ۱۰۰۰؛ پیش‌انتشار: **۱.۰.۱**، بیلد ۱۰۱۱).
+   بیلد ۱۰۰۰؛ پیش‌انتشار: **۱.۱.۰**، بیلد ۱۱۰۱).
 ۲. نصب کنید و رامش را باز کنید.
 ۳. دسترسی پیامک، مخاطبین و اعلان را بدهید.
 ۴. درخواست «برنامهٔ پیامک پیش‌فرض» را بپذیرید.

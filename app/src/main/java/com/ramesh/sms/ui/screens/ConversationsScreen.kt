@@ -130,7 +130,6 @@ import com.ramesh.sms.ChatNav
 import com.ramesh.sms.R
 import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.util.AppLanguage
-import com.ramesh.sms.data.util.JalaliScope
 import com.ramesh.sms.data.model.SearchMessageResult
 import androidx.compose.ui.semantics.Role
 import com.ramesh.sms.data.model.SenderTab
@@ -643,7 +642,8 @@ fun ConversationsScreen(
                                         selectedIds = NoSelectionIds,
                                         isSelectionMode = false,
                                         simSlotNumber = if (hasMultipleSims && state.showSimBadge) simSlotMap[thread.subId] else null,
-                                        useShamsi = state.jalaliScope == JalaliScope.EVERYWHERE,
+                                        useShamsi = state.useShamsiInLists,
+                                        appLanguage = state.appLanguage,
                                         onClick = {
                                             openChat(
                                                 ChatNav(
@@ -690,7 +690,7 @@ fun ConversationsScreen(
                                     item = msg,
                                     searchQuery = state.searchQuery,
                                     simSlotNumber = if (hasMultipleSims) simSlotMap[msg.subId] else null,
-                                    useShamsi = state.jalaliScope == JalaliScope.EVERYWHERE,
+                                    useShamsi = state.useShamsiInLists,
                                     appLanguage = state.appLanguage,
                                     onClick = {
                                         openChat(
@@ -791,7 +791,7 @@ fun ConversationsScreen(
                     simSlotMap = simSlotMap,
                     hasMultipleSims = hasMultipleSims,
                     showSimBadge = state.showSimBadge,
-                    useShamsi = state.jalaliScope == JalaliScope.EVERYWHERE,
+                    useShamsi = state.useShamsiInLists,
                     appLanguage = state.appLanguage,
                     onOpenChat = openChat,
                     onToggleSelect = viewModel::toggleSelectThread,

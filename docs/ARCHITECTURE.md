@@ -83,13 +83,41 @@ Three rules keep that path honest:
 always wins over a stored verdict (`resolveInboxAction`), and editing a rule or a sender preference
 drops the affected verdicts so the next read re-evaluates.
 
+## The bubble mini-menu
+
+A single tap on a bubble opens `MessageMiniMenu` - copy, forward, and a "more" grid with share,
+react, info, select and report-spam. Holding a message still enters selection mode, so the two
+gestures never compete. The message text stays inside a `SelectionContainer` in the menu, which is
+how a *part* of a long message is copied: selecting inside the list would fight the scrolling and
+the tap gesture.
+
+What is tappable in that text is decided by `MessageLinkScanner`, a pure function with its own unit
+tests. URLs are collected first and their ranges are excluded from the phone and date passes, so
+`https://example.com/1404/03/23` is one link and not a link plus a date. The same file exposes
+`findOtpHighlight`, which turns the code `OtpDetector` found into a range the menu can highlight and
+copy on its own.
+
+"Report spam" has no default number: `7726` is the British/American short code, Iranian operators
+publish their own, so `AppPreferences.spamReportNumber` starts empty and the confirmation dialog asks
+for it once.
+
+## Dates and calendars
+
+Two stored preferences can ask for Jalali dates - the `JalaliScope` picked in Settings and the older
+`showShamsiDate` flag that tapping a date inside a chat toggles. `showsJalaliDates(scope, flag)` is
+the only place that combines them, and every screen calls it, so the inbox and the chat cannot
+disagree about the calendar any more (they did: the list only looked at the scope).
+
+`AppLanguage.isPersian()` resolves `SYSTEM` against the device locale. Date formatting used to
+compare against `PERSIAN` directly, so a Persian phone on "System default" was formatted as English.
+
 ## Storage
 
 | Store | Contents |
 | --- | --- |
 | Telephony provider | the messages themselves (shared with every SMS app) |
 | `ramesh_filters.db` v7 | `filter_rules`, `predefined_rule_settings`, `sender_preferences`, `spam_message_meta`, `cached_threads`, `sender_tabs` + `sender_tab_members`, `message_reactions` |
-| `ramesh_prefs` | 14 behavioural settings (tabs, SIM badge, delivery reports, send delay, auto-delete, lock-screen privacy, language, calendar scope, …) |
+| `ramesh_prefs` | 15 behavioural settings (tabs, SIM badge, delivery reports, send delay, auto-delete, lock-screen privacy, language, calendar scope, …) |
 | `ramesh_appearance` | 19 look-and-feel settings (`Appearance` / `AppearanceStore`) |
 
 `AppearanceStore` serialises enums by `Enum.name`, so a renamed constant would silently reset a
@@ -143,7 +171,8 @@ English UI.
 `app/src/test` holds JVM unit tests for the pure logic: filter engine, OTP detector, Persian
 number/phone canonicalisation, tab matching, date formats, send tracker, inbox action resolution,
 the refresh scheduler, the inbox snapshot maths (`InboxSnapshotTest`) and the per-message verdicts
-(`InboxActionEvaluatorTest`). `RameshDatabaseHelperCacheTest` runs under Robolectric against a real
+(`InboxActionEvaluatorTest`), the bubble's link/OTP scanner (`MessageLinkScannerTest`) and the
+calendar/language rules (`DateCalendarTest`). `RameshDatabaseHelperCacheTest` runs under Robolectric against a real
 SQLite database and asserts the cache diff with SQLite triggers, so "unchanged row was not rewritten"
 is proven by the absence of a write rather than by comparing values. `TestLabScreen` (debug builds only) injects fake SMS through the real
 receiver for manual end-to-end checks.

@@ -57,6 +57,11 @@ import com.ramesh.sms.ui.util.forMessageBody
 fun MessageBubble(
     message: SmsMessage,
     onLongClick: () -> Unit,
+    /**
+     * A single tap on the bubble. Opens the mini-menu (copy / forward / more); a long press still
+     * selects the message, exactly as before.
+     */
+    onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     isHighlighted: Boolean = false,
     simSlotNumber: Int? = null,
@@ -164,7 +169,7 @@ fun MessageBubble(
                         indication = null,
                         onClick = {
                             onBubbleTouched()
-                            if (isSelectionMode) onToggleSelect()
+                            if (isSelectionMode) onToggleSelect() else onTap?.invoke()
                         },
                         onLongClick = onLongClick
                     )
