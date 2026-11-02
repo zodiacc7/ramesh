@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     tags:
+      # Three-part (1.1.0-pre) and four-part (1.1.0.03-pre) pre-release tags.
       - "[0-9]+.[0-9]+.[0-9]+-pre"
+      - "[0-9]+.[0-9]+.[0-9]+.[0-9]+-pre"
 
 permissions:
   contents: write

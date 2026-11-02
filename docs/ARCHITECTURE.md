@@ -85,18 +85,30 @@ drops the affected verdicts so the next read re-evaluates.
 
 ## The message action bar
 
-A single tap on a bubble opens `MessageActionBar`: one horizontal strip floating over the top of the
-chat - the Textra layout - carrying copy, react, share, forward, delete, info and mark-as-read in a
-single row. Nothing hides behind a "More" submenu, so every action is one tap away, and the strip
-sits above the message rather than over it, so the bubble it acts on stays readable. Copy is the one
-action with a text label; the rest lean on their icons and on the content description read by
-TalkBack. When a verification code was detected, `findOtpHighlight` provides a chip on the left of
+A single tap on a bubble opens `MessageActionBar`: one horizontal strip carrying copy, react, share,
+forward, delete, info and read/unread in a single row - the Textra layout. It is a child of the chat
+`Box`, not a `Dialog`, which is what lets it open **over the message that was tapped** (the bubble
+reports its `boundsInRoot` through `MessageBubble.onBubbleBounds`, the strip is placed above it and
+drops below when there is no room) and is also why nothing behind it is dimmed: the only other thing
+in the overlay is a transparent `detectTapGestures` layer that closes it. Scrolling closes it too,
+because the bubble has moved out from under it by then. Nothing hides behind a "More" submenu, so
+every action is one tap away. Copy is the one action with a text label; the rest lean on their icons
+and on the content description read by TalkBack. When a verification code was detected, `findOtpHighlight` provides a chip on the left of
 the strip that copies the code itself.
 
+Two actions are deliberately not single-tap: delete arms on the first tap (the bin turns red and
+filled) and only deletes on the second, and the read marker toggles rather than only marking read -
+on a conversation with nothing unread it marks the conversation *unread*, which is the only way that
+button can do something visible in both states. Copy does both things at once: it puts the whole body
+on the clipboard and opens `SelectableMessageDialog`, a read-only `BasicTextField` whose selection
+starts as the entire text, so a single line can be narrowed down and copied on its own. Info opens
+`MessageDetailsDialog` (type, SIM slot, SIM name, the other party, sent and delivered times).
+
 Holding a message still enters selection mode, so the two gestures never compete. Full-text
-selection lives in the long-press "Message options" dialog, which keeps the body in a
+selection also lives in the long-press "Message options" dialog, which keeps the body in a
 `SelectionContainer` - that is how a *part* of a long message is copied, since selecting inside the
-list would fight the scrolling and the tap gesture.
+list would fight the scrolling and the tap gesture. The reaction button is hidden on sent messages:
+you cannot react to your own.
 
 What is tappable in a message body is decided by `MessageLinkScanner`, a pure function with its own
 unit tests. URLs are collected first and their ranges are excluded from the phone and date passes,

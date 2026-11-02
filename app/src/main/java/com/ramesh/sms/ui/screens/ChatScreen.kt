@@ -124,7 +124,13 @@ import com.ramesh.sms.ui.components.ContactProfileDialog
 import com.ramesh.sms.ui.components.ConversationAvatar
 import com.ramesh.sms.ui.components.ForwardMessageDialog
 import com.ramesh.sms.ui.components.MessageBubble
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
 import com.ramesh.sms.ui.components.MessageActionBar
+import com.ramesh.sms.ui.components.MessageDetailsDialog
+import com.ramesh.sms.ui.components.SelectableMessageDialog
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
@@ -178,8 +184,17 @@ fun ChatScreen(
 
     val textToolbar = LocalTextToolbar.current
     var selectedMessageForDialog by remember { mutableStateOf<SmsMessage?>(null) }
-    // A single tap on a bubble opens the action strip; the rest is what that strip can start.
+    // A single tap on a bubble opens the action strip over that bubble; the rest is what it starts.
     var actionBarMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    var actionBarAnchor by remember { mutableStateOf<Rect?>(null) }
+    var deleteArmed by remember { mutableStateOf(false) }
+    /** Text shown in the "copy text" dialog, where the whole body starts selected. */
+    var copyText by remember { mutableStateOf<String?>(null) }
+    var detailsMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    // Bubble bounds, in root coordinates, recorded as the list lays out. A plain map on purpose:
+    // this is read once per tap, so it must not trigger a recomposition on every scroll frame.
+    val bubbleBounds = remember { mutableMapOf<Long, Rect>() }
+    var contentOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var forwardBody by remember { mutableStateOf<String?>(null) }
     var forwardTargets by remember { mutableStateOf<List<ConversationThread>>(emptyList()) }
     var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -661,6 +676,9 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // Where this box sits in the window, so a bubble's root-relative bounds can be turned
+                // into a position for the action strip.
+                .onGloballyPositioned { contentOrigin = it.boundsInRoot().topLeft }
         ) {
             ChatBackdropBackground(
                 appearance = look,
@@ -728,7 +746,15 @@ fun ChatScreen(
                     isSelectionMode = isSelectionMode,
                     selectedMessageIds = selectedMessageIds,
                     onTapMessage = onTapMessage,
-                    onTapBubble = { message -> actionBarMessage = message },
+                    onTapBubble = { message ->
+                        deleteArmed = false
+                        actionBarAnchor = bubbleBounds[message.id]?.translate(
+                            -contentOrigin.x,
+                            -contentOrigin.y
+                        )
+                        actionBarMessage = message
+                    },
+                    onBubbleBounds = { id, bounds -> bubbleBounds[id] = bounds },
                     activeTextBubbleId = activeTextBubbleId,
                     selectionResetTick = selectionResetTick,
                     onBubbleTouched = { id -> activeTextBubbleId = id },
@@ -776,7 +802,111 @@ fun ChatScreen(
                     )
                 }
             }
+
+            // The action strip is a child of the chat itself, not a dialog: it can sit on top of the
+            // bubble that was tapped and it never dims the conversation behind it.
+            actionBarMessage?.let { message ->
+                val anchorRect = actionBarAnchor
+                if (anchorRect != null) {
+                    val threadIsRead = state.messages.none { it.isInbox && !it.read }
+                    MessageActionBar(
+                        anchor = anchorRect,
+                        otpCode = remember(message.id, message.body) {
+                            findOtpHighlight(message.body)?.code
+                        },
+                        canReact = !message.isSent,
+                        markedRead = threadIsRead,
+                        deleteArmed = deleteArmed,
+                        onCopyCode = {
+                            actionBarMessage = null
+                            copyToClipboard(findOtpHighlight(message.body)?.code.orEmpty())
+                        },
+                        onCopy = {
+                            actionBarMessage = null
+                            copyToClipboard(message.body)
+                            // Same tap, second half: open the body with everything selected so a
+                            // single line can be picked out of a long message.
+                            copyText = message.body
+                        },
+                        onReact = {
+                            actionBarMessage = null
+                            reactionPickerMessageId = message.id
+                        },
+                        onShare = {
+                            actionBarMessage = null
+                            val share = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, message.body)
+                            }
+                            runCatching {
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        share,
+                                        context.getString(R.string.chat_menu_share)
+                                    )
+                                )
+                            }
+                        },
+                        onForward = {
+                            actionBarMessage = null
+                            forwardBody = message.body
+                            coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
+                        },
+                        onDelete = {
+                            if (deleteArmed) {
+                                actionBarMessage = null
+                                deleteArmed = false
+                                viewModel.deleteMessage(message.id)
+                            } else {
+                                // First tap only opens the bin; the second one deletes.
+                                deleteArmed = true
+                            }
+                        },
+                        onInfo = {
+                            actionBarMessage = null
+                            detailsMessage = message
+                        },
+                        onToggleRead = {
+                            actionBarMessage = null
+                            viewModel.toggleConversationRead()
+                        },
+                        onDismiss = {
+                            actionBarMessage = null
+                            deleteArmed = false
+                        },
+                        modifier = Modifier.zIndex(6f)
+                    )
+                }
+            }
         }
+    }
+
+    // Scrolling moves the bubble out from under its strip, so the strip goes with it.
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            actionBarMessage = null
+            deleteArmed = false
+        }
+    }
+
+    // Copy with the whole body selected, ready to be narrowed down to one line.
+    copyText?.let { text ->
+        SelectableMessageDialog(
+            text = text,
+            onCopy = { picked -> copyToClipboard(picked) },
+            onDismiss = { copyText = null }
+        )
+    }
+
+    // "Message details", the way Textra lays it out.
+    detailsMessage?.let { message ->
+        MessageDetailsDialog(
+            message = message,
+            sim = state.availableSims.firstOrNull { it.subscriptionId == message.subId },
+            useShamsi = state.showShamsiDate,
+            appLanguage = state.appLanguage,
+            onDismiss = { detailsMessage = null }
+        )
     }
 
     // Contact Profile Dialog (when tapping top bar for non-contact, or avatar quick preview)
@@ -822,60 +952,6 @@ fun ChatScreen(
             onCreateTab = { name ->
                 viewModel.createTabWithCurrentSender(name)
             }
-        )
-    }
-
-    // Action strip: one tap on a bubble. A single horizontal bar with Copy, React, Share, Forward,
-    // Delete, Info and Mark as read - the Textra layout - floating over the top of the chat so the
-    // message it acts on stays visible underneath.
-    actionBarMessage?.let { message ->
-        val otpCode = remember(message.id, message.body) {
-            findOtpHighlight(message.body)?.code
-        }
-        MessageActionBar(
-            otpCode = otpCode,
-            onCopyCode = {
-                actionBarMessage = null
-                copyToClipboard(otpCode.orEmpty())
-            },
-            onCopy = {
-                actionBarMessage = null
-                copyToClipboard(message.body)
-            },
-            onReact = {
-                actionBarMessage = null
-                reactionPickerMessageId = message.id
-            },
-            onShare = {
-                actionBarMessage = null
-                val share = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, message.body)
-                }
-                runCatching {
-                    context.startActivity(
-                        Intent.createChooser(share, context.getString(R.string.chat_menu_share))
-                    )
-                }
-            },
-            onForward = {
-                actionBarMessage = null
-                forwardBody = message.body
-                coroutineScope.launch { forwardTargets = viewModel.forwardTargets() }
-            },
-            onDelete = {
-                actionBarMessage = null
-                viewModel.deleteMessage(message.id)
-            },
-            onInfo = {
-                actionBarMessage = null
-                selectedMessageForDialog = message
-            },
-            onMarkRead = {
-                actionBarMessage = null
-                viewModel.markConversationRead()
-            },
-            onDismiss = { actionBarMessage = null }
         )
     }
 
@@ -1121,6 +1197,8 @@ private fun ChatMessageList(
     onTapMessage: (SmsMessage) -> Unit = {},
     /** A single tap on a bubble, which opens the action strip. */
     onTapBubble: (SmsMessage) -> Unit = {},
+    /** Bubble bounds, in root coordinates, recorded so the strip can sit over its own message. */
+    onBubbleBounds: (Long, Rect) -> Unit = { _, _ -> },
     activeTextBubbleId: Long? = null,
     selectionResetTick: Int = 0,
     onBubbleTouched: (Long) -> Unit = {},
@@ -1239,6 +1317,7 @@ private fun ChatMessageList(
                         onToggleDateFormat = onDateTapAction,
                         onLongClick = { onLongClick(message) },
                         onTap = { if (!isSelectionMode) onTapBubble(message) },
+                        onBubbleBounds = { bounds -> onBubbleBounds(message.id, bounds) },
                         isSelectionMode = isSelectionMode,
                         isSelected = message.id in selectedMessageIds,
                         onToggleSelect = { onTapMessage(message) },

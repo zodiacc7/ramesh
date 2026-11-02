@@ -26,4 +26,17 @@
     <string name="chat_menu_forward_failed">بازفرست پیام نشد</string>
     <string name="chat_menu_otp">کد %1$s</string>
     <string name="chat_menu_otp_copy">کپی کد</string>
-    <string name="chat_mark_read">علامت‌گذاری به‌عنوان خوانده‌شده</string></resources>
+    <string name="chat_mark_read">علامت‌گذاری به‌عنوان خوانده‌شده</string>    <string name="chat_delete_confirm">برای حذف دوباره بزنید</string>
+    <string name="chat_mark_unread">علامت‌گذاری به‌عنوان خوانده‌نشده</string>
+    <string name="chat_copy_text_title">کپی متن</string>
+    <string name="chat_copy_selection">کپی انتخاب</string>
+    <string name="chat_details_title">جزئیات پیام</string>
+    <string name="chat_details_type">نوع</string>
+    <string name="chat_details_type_sms">اس‌ام‌اس</string>
+    <string name="chat_details_sim_slot">شیار سیم‌کارت</string>
+    <string name="chat_details_sim_name">نام سیم‌کارت</string>
+    <string name="chat_details_to">به</string>
+    <string name="chat_details_sent">ارسال</string>
+    <string name="chat_details_delivered">تحویل</string>
+    <string name="chat_details_unknown">—</string>
+</resources>

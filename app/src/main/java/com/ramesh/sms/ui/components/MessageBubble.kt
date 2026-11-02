@@ -32,6 +32,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -62,6 +65,11 @@ fun MessageBubble(
      * info / mark as read); a long press still selects the message, exactly as before.
      */
     onTap: (() -> Unit)? = null,
+    /**
+     * Where the bubble ended up on screen, reported as it is laid out. The action strip is placed
+     * over the bubble it was opened from, so it needs those bounds; nothing else uses them.
+     */
+    onBubbleBounds: (Rect) -> Unit = {},
     modifier: Modifier = Modifier,
     isHighlighted: Boolean = false,
     simSlotNumber: Int? = null,
@@ -163,6 +171,9 @@ fun MessageBubble(
                 shadowElevation = 0.dp,
                 modifier = Modifier
                     .widthIn(min = 80.dp, max = maxBubbleWidth)
+                    .onGloballyPositioned { coords ->
+                        if (coords.isAttached) onBubbleBounds(coords.boundsInRoot())
+                    }
                     // The bubble itself has to take the long press: it used to be handled only by
                     // the empty space next to it (and by the text selection container), which is
                     // why selecting a message only worked by accident.
