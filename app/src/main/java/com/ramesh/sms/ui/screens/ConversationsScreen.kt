@@ -764,7 +764,6 @@ fun ConversationsScreen(
                                 }
                             }
                             else "Incoming SMS messages will appear here",
-                            else "Incoming SMS messages will appear here",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
