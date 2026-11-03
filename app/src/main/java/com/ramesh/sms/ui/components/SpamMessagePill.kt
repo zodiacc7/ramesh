@@ -83,7 +83,12 @@ fun SpamMessagePill(
     onLongClick: () -> Unit = {},
     onToggleSelect: () -> Unit = {},
     appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    /** Whether a freshly filtered message is marked "New" (Settings toggle). */
+    showNewSpam: Boolean = true,
 ) {
+    // Two-step delete, like everywhere else: the first tap turns the bin red and fills it, the
+    // second one deletes. Nothing is asked in a dialog.
+    var deleteArmed by remember(message.id) { mutableStateOf(false) }
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) SpamWarningDark else SpamWarningLight
     val textColor = if (isDark) SpamWarningOnDark else SpamWarningOnLight
@@ -158,7 +163,7 @@ fun SpamMessagePill(
                             )
                             // Which filtered message is the one the tab badge is counting: the
                             // flag that feeds the badge is shown here, on the message itself.
-                            if (message.isNewSpam) {
+                            if (showNewSpam && message.isNewSpam) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = PillShape,
@@ -316,19 +321,31 @@ fun SpamMessagePill(
                             }
 
                             TextButton(
-                                onClick = onDelete
+                                onClick = {
+                                    if (deleteArmed) onDelete() else deleteArmed = true
+                                }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
+                                    imageVector = if (deleteArmed) {
+                                        Icons.Default.Delete
+                                    } else {
+                                        Icons.Default.DeleteOutline
+                                    },
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
+                                    tint = if (deleteArmed) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                                    },
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = stringResource(R.string.comp_delete),
+                                    text = stringResource(
+                                        if (deleteArmed) R.string.comp_delete_again else R.string.comp_delete
+                                    ),
                                     style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = if (deleteArmed) FontWeight.Bold else FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }

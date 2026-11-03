@@ -3,6 +3,7 @@ package com.ramesh.sms.theme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
@@ -10,38 +11,74 @@ import androidx.compose.ui.unit.dp
 /**
  * Hand-drawn icons for the few glyphs Material does not ship.
  *
- * Material's `Share` is three nodes joined by two plain lines. The share glyph Textra draws - and the
- * one users recognise from the Android system share sheet - has an **arrowhead** on the upper node,
- * pointing away from the group. That difference is why the Material version looked like the wrong
- * icon in the action strip, so the shape is built here: two dots, two connecting lines, one arrow.
+ * The action strip follows the reference layout: share is Material's own share glyph (three nodes
+ * and two plain lines, no arrowhead), forward is a semicircular arrow that starts at the bottom and
+ * curves to the left, and select is the "list with a double check" mark rather than a bare double
+ * check - a bare check is what a "mark as read" button looks like, and this one selects messages.
  */
 object RameshIcons {
 
-    /** Share: two dots, the connecting lines, and an arrow leaving towards the top right. */
-    val Share: ImageVector by lazy {
+    /**
+     * Forward: a semicircular arrow that leaves the message from the bottom and points to the left.
+     *
+     * Drawn with a stroke instead of a filled block so its weight matches the neighbouring Material
+     * icons at 21 dp.
+     */
+    val Forward: ImageVector by lazy {
         ImageVector.Builder(
-            name = "RameshShare",
+            name = "RameshForward",
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,
             viewportHeight = 24f
         )
             .addPath(
-                pathData = nodes(
-                    "M6,16.2 A2.7,2.7 0 1,1 6,10.8 A2.7,2.7 0 1,1 6,16.2 Z " +
-                        "M18.2,22.1 A2.7,2.7 0 1,1 18.2,16.7 A2.7,2.7 0 1,1 18.2,22.1 Z"
-                ),
-                fill = SolidColor(Color.Black)
-            )
-            .addPath(
-                pathData = nodes("M7.9,14.8 L16.4,18.5 M7.9,12.2 L14.4,8.5"),
+                pathData = nodes("M19.2,20.5 C19.2,12.6 15.1,9.6 8.6,9.6"),
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = 2f,
                 strokeLineCap = StrokeCap.Round
             )
             .addPath(
-                pathData = nodes("M21.7,2.3 L20.7,10.4 L13.5,6.1 Z"),
-                fill = SolidColor(Color.Black)
+                pathData = nodes("M12.6,4.6 L7.2,9.6 L12.6,14.6"),
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            )
+            .build()
+    }
+
+    /**
+     * Select: a short rule above a double check, the mark that means "act on this message" in the
+     * strip. The rule is what separates it at a glance from the read/unread double check.
+     */
+    val SelectList: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RameshSelectList",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        )
+            .addPath(
+                pathData = nodes("M5,5.2 L19,5.2"),
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round
+            )
+            .addPath(
+                pathData = nodes("M2.6,12.6 L6.6,16.6 L13.2,9.2"),
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            )
+            .addPath(
+                pathData = nodes("M11.4,17.6 L15.4,21.6 L22,14.2"),
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
             )
             .build()
     }

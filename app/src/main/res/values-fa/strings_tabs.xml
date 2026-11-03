@@ -30,4 +30,7 @@
     <string name="tab_none_yet">هنوز تبی ساخته نشده است</string>
     <string name="tab_none_hint">برای ساخت، روی «تب جدید» در بالا بزنید.</string>
     <string name="tab_sender_count">%1$d فرستنده</string>
+    <string name="tab_builtin_contacts">مخاطبین</string>
+    <string name="tab_builtin_other">سایر</string>
+    <string name="tab_builtin_spam">اسپم</string>
 </resources>

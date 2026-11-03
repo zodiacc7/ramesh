@@ -60,8 +60,6 @@
     <string name="settings_sim_filter_sub">فیلتر گفتگوها بر اساس سیم‌کارت</string>
     <string name="settings_contact_photos">عکس مخاطب</string>
     <string name="settings_contact_photos_sub">نمایش تصویر در فهرست گفتگوها</string>
-    <string name="settings_contacts_only">فقط مخاطبین</string>
-    <string name="settings_contacts_only_sub">پنهان‌کردن گفتگوهای فرستندهٔ ناشناس</string>
     <string name="settings_notifications_header">اعلان‌ها</string>
     <string name="settings_notifications_sub">هشدار پیام‌ها</string>
     <string name="settings_delete_action">دکمهٔ حذف</string>
@@ -119,4 +117,6 @@
     <string name="settings_about_body">رامش یک پیام‌رسان SMS سریع و خصوصی با شخصی‌سازی کامل ظاهر، رابط فارسی و انگلیسی، تب‌های فرستنده، فیلتر اسپم و بدون تبلیغات و ردیاب است.</string>
     <string name="settings_about_source">کد منبع: github.com/zodiacc7/ramesh</string>
     <string name="settings_about_close">بستن</string>
+    <string name="settings_new_spam">نمایش اسپم‌های جدید</string>
+    <string name="settings_new_spam_sub">اسپم فیلترشده‌ای که تازه رسیده و باز نشده، هم در صندوق ورودی و هم داخل گفتگو علامت‌گذاری شود</string>
 </resources>

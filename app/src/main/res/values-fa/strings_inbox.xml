@@ -20,8 +20,6 @@
     <string name="inbox_marked_read_count">%1$d گفتگو خوانده‌شده شد</string>
     <string name="inbox_all_marked_read">همهٔ گفتگوها خوانده‌شده شدند</string>
     <string name="inbox_all_already_read">همهٔ گفتگوها از قبل خوانده شده‌اند</string>
-    <string name="inbox_showing_contacts_only">فقط مخاطبین نمایش داده می‌شود</string>
-    <string name="inbox_showing_all">همهٔ گفتگوها نمایش داده می‌شود</string>
     <string name="inbox_deleted_count">%1$d گفتگو حذف شد</string>
     <string name="inbox_added_to_tab_count">%1$d گفتگو به تب افزوده شد</string>
     <string name="inbox_tab_created">تب %1$s ساخته شد</string>
@@ -38,4 +36,6 @@
     <string name="inbox_empty_snippet">پیامی نیست</string>
     <string name="inbox_search_hint">جست‌وجوی گفتگو یا شماره…</string>
     <string name="inbox_close_search">بستن جست‌وجو</string>
+    <string name="inbox_delete_again">برای حذف دوباره روی سطل بزنید</string>
+    <string name="inbox_undo_deleted">حذف شد — برای بازگرداندن بزنید</string>
 </resources>

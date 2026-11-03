@@ -1,0 +1,27 @@
+Ramesh 1.1.0.06 (build 1010006) — pre-release.
+
+Tapping a message that is only half on screen no longer crashes. The action strip is now placed with an offset that is clamped inside the window instead of padding, which is what could hand it a position outside the screen when a bubble was partly scrolled away.
+
+Deleting:
+- Every delete in the app is two steps on the same bin: the outline bin fills in and turns red on the first tap, the second tap deletes. That covers the strip, the selection bar (chat and inbox), the long-press sheet, the swipe action, the spam card and the tab sheet.
+- No delete asks a question any more: the batch-delete dialog and the delete-tab dialog are gone.
+- After any deletion one undo icon appears at the top of the screen for 20 seconds, and it brings back everything deleted inside that window. The snackbar undo is gone; that icon is the only undo.
+
+Icons, as in the reference:
+- Share is Material's own share glyph again.
+- Select is the list-with-a-double-check mark.
+- Forward is a semicircular arrow that starts at the bottom and points to the left.
+
+Forwarding: the "Forward to" sheet has a search field now, so a recipient can be found by name, number or message text.
+
+Tabs:
+- Fresh installs start with Contacts, Other, All and Spam in that order. Contacts shows saved contacts only, Other shows unknown senders that are not spam, Spam shows filtered spam only. All still holds everything.
+- Entering a tab always starts at the top of that tab's list instead of wherever the previous tab was scrolled.
+
+Inbox:
+- The "Contacts only" button is gone from the top bar, and so is its row in Settings — Contacts is a tab of its own now.
+- Settings has a new switch, "Show new spam", which turns the new-spam marks on or off (the solid shield chip in the inbox and the "New" badge on a filtered message).
+
+Dates are untouched in this build.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.

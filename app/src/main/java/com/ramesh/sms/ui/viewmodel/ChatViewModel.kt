@@ -65,7 +65,13 @@ data class ChatUiState(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** Countdown for the configurable "send delay"; 0 when no message is queued. */
     val pendingSendSecondsLeft: Int = 0,
-    val pendingSendText: String? = null
+    val pendingSendText: String? = null,
+    /** Messages hidden while they wait out the undo window before being deleted for real. */
+    val pendingDeleteIds: Set<Long> = emptySet(),
+    /** When the undo window closes; 0 when nothing is waiting. */
+    val undoUntil: Long = 0L,
+    /** Whether freshly filtered spam is marked as new (Settings toggle). */
+    val showNewSpam: Boolean = true
 )
 
 class ChatViewModel(
@@ -84,6 +90,7 @@ class ChatViewModel(
         private set
     var isDeletingSelection by mutableStateOf(false)
         private set
+    private val pendingMessageDeletes = mutableMapOf<Long, Job>()
     private var messagesJob: Job? = null
     private var olderJob: Job? = null
     private var observerDebounceJob: Job? = null
@@ -102,6 +109,7 @@ class ChatViewModel(
             ),
             enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle,
             appLanguage = userPreferences.appLanguage,
+            showNewSpam = userPreferences.showNewSpam,
         )
     )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -493,14 +501,39 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Hides a message and deletes it for real when the undo window closes.
+     *
+     * Deleting immediately (and offering an "undo" that re-inserted rows) would mean writing back
+     * into the SMS provider, which only a default SMS app may do reliably. Hiding first makes undo
+     * a local cancellation instead of a restore, so it works on any install.
+     */
     fun deleteMessage(messageId: Long) {
-        viewModelScope.launch {
-            val success = repository.deleteMessage(messageId)
-            if (success) {
+        if (messageId in _uiState.value.pendingDeleteIds) return
+        _uiState.value = _uiState.value.copy(
+            pendingDeleteIds = _uiState.value.pendingDeleteIds + messageId,
+            undoUntil = System.currentTimeMillis() + UNDO_DELETE_WINDOW_MILLIS
+        )
+        pendingMessageDeletes.remove(messageId)?.cancel()
+        pendingMessageDeletes[messageId] = viewModelScope.launch {
+            delay(UNDO_DELETE_WINDOW_MILLIS)
+            pendingMessageDeletes.remove(messageId)
+            _uiState.value = _uiState.value.copy(
+                pendingDeleteIds = _uiState.value.pendingDeleteIds - messageId
+            )
+            if (repository.deleteMessage(messageId)) {
                 val updated = _uiState.value.messages.filter { it.id != messageId }
                 _uiState.value = _uiState.value.copy(messages = updated)
             }
         }
+    }
+
+    /** Brings back every message waiting out the undo window. */
+    fun undoPendingDeletions() {
+        val pending = _uiState.value.pendingDeleteIds
+        if (pending.isEmpty()) return
+        pending.forEach { pendingMessageDeletes.remove(it)?.cancel() }
+        _uiState.value = _uiState.value.copy(pendingDeleteIds = emptySet(), undoUntil = 0L)
     }
 
     /** Clears the unread badge of this conversation; used by the swipe-to-mark-read action. */
@@ -553,31 +586,12 @@ class ChatViewModel(
     }
 
     fun deleteSelectedMessages(onComplete: (Int) -> Unit = {}) {
-        if (isDeletingSelection) return
         val targetIds = selectedMessageIds.toSet()
         if (targetIds.isEmpty()) return
-        isDeletingSelection = true
-        viewModelScope.launch {
-            try {
-                val successfullyDeletedIds = mutableSetOf<Long>()
-                for (id in targetIds) {
-                    if (repository.deleteMessage(id)) {
-                        successfullyDeletedIds.add(id)
-                    }
-                }
-                if (successfullyDeletedIds.isNotEmpty()) {
-                    val updated = _uiState.value.messages.filter { it.id !in successfullyDeletedIds }
-                    _uiState.value = _uiState.value.copy(messages = updated)
-                }
-                selectedMessageIds.removeAll(successfullyDeletedIds)
-                if (selectedMessageIds.isEmpty()) {
-                    isSelectionMode = false
-                }
-                onComplete(successfullyDeletedIds.size)
-            } finally {
-                isDeletingSelection = false
-            }
-        }
+        targetIds.forEach { deleteMessage(it) }
+        selectedMessageIds.clear()
+        isSelectionMode = false
+        onComplete(targetIds.size)
     }
 
     fun updateSenderDefaultAction(action: FilterAction) {

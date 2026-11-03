@@ -60,8 +60,6 @@
     <string name="settings_sim_filter_sub">Filter conversations by SIM card</string>
     <string name="settings_contact_photos">Contact photos</string>
     <string name="settings_contact_photos_sub">Show avatars in the conversation list</string>
-    <string name="settings_contacts_only">Contacts only</string>
-    <string name="settings_contacts_only_sub">Hide conversations from unknown senders</string>
     <string name="settings_notifications_header">Notifications</string>
     <string name="settings_notifications_sub">Message alerts</string>
     <string name="settings_delete_action">Delete action</string>
@@ -119,4 +117,6 @@
     <string name="settings_about_body">Ramesh is a fast, private SMS messenger with deep theme customisation, Persian and English interfaces, sender tabs, spam filtering and no ads or trackers.</string>
     <string name="settings_about_source">Source code: github.com/zodiacc7/ramesh</string>
     <string name="settings_about_close">Close</string>
+    <string name="settings_new_spam">Show new spam</string>
+    <string name="settings_new_spam_sub">Mark filtered spam that arrived and has not been opened yet, in the inbox and inside the conversation</string>
 </resources>

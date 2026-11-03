@@ -61,34 +61,43 @@ class AppPreferencesTest {
     }
 
     @Test
-    fun defaultShowContactsOnlyIsFalse() {
+    fun defaultShowNewSpamIsTrue() {
         val fakePrefs = InMemorySharedPreferences()
         val appPreferences = AppPreferences(fakePrefs.proxy)
 
-        assertFalse(appPreferences.showContactsOnly)
+        assertTrue(appPreferences.showNewSpam)
     }
 
     @Test
-    fun showContactsOnlyPersistsWhenSet() {
+    fun showNewSpamPersistsWhenSet() {
         val fakePrefs = InMemorySharedPreferences()
         val appPreferences = AppPreferences(fakePrefs.proxy)
 
-        appPreferences.showContactsOnly = true
-        assertTrue(appPreferences.showContactsOnly)
-        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY])
+        appPreferences.showNewSpam = false
+        assertFalse(appPreferences.showNewSpam)
+        assertEquals(false, fakePrefs.storage[AppPreferences.KEY_SHOW_NEW_SPAM])
 
-        appPreferences.showContactsOnly = false
-        assertFalse(appPreferences.showContactsOnly)
-        assertEquals(false, fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY])
+        appPreferences.showNewSpam = true
+        assertTrue(appPreferences.showNewSpam)
+        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_SHOW_NEW_SPAM])
     }
 
     @Test
-    fun showContactsOnlyInitializesFromExistingStoredValue() {
+    fun builtInTabsAreSeededOnlyOnce() {
         val fakePrefs = InMemorySharedPreferences()
-        fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY] = true
-
         val appPreferences = AppPreferences(fakePrefs.proxy)
-        assertTrue(appPreferences.showContactsOnly)
+
+        assertFalse(appPreferences.defaultTabsSeeded)
+        appPreferences.defaultTabsSeeded = true
+        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_DEFAULT_TABS_SEEDED])
+    }
+
+    @Test
+    fun defaultAllTabIndexLeavesRoomForContactsAndOther() {
+        val fakePrefs = InMemorySharedPreferences()
+        val appPreferences = AppPreferences(fakePrefs.proxy)
+
+        assertEquals(2, appPreferences.allTabIndex)
     }
 
     @Test

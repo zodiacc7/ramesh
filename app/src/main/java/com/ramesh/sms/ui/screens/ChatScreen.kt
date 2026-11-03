@@ -41,8 +41,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.Call
@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -140,6 +141,8 @@ import com.ramesh.sms.ui.components.MessageDetailsDialog
 import com.ramesh.sms.ui.components.SimToggleButton
 import com.ramesh.sms.ui.components.SmsSegmentCounter
 import com.ramesh.sms.ui.components.SpamMessagePill
+import com.ramesh.sms.ui.components.UndoIconButton
+import com.ramesh.sms.ui.components.rememberUndoAvailable
 import com.ramesh.sms.ui.util.ContactUtils
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
@@ -202,9 +205,15 @@ fun ChatScreen(
     var contentOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var forwardBody by remember { mutableStateOf<String?>(null) }
     var forwardTargets by remember { mutableStateOf<List<ConversationThread>>(emptyList()) }
-    var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
+    // The bin in the selection bar works exactly like the one in the strip: first tap arms it
+    // (filled, red), second tap deletes. No confirmation window.
+    var selectionDeleteArmed by remember { mutableStateOf(false) }
     val selectedMessageIds = viewModel.selectedMessageIds
     val isSelectionMode = viewModel.isSelectionMode
+    val undoAvailable = rememberUndoAvailable(state.undoUntil)
+    LaunchedEffect(isSelectionMode, selectedMessageIds.size) {
+        if (!isSelectionMode) selectionDeleteArmed = false
+    }
     var activeTextBubbleId by remember { mutableStateOf<Long?>(null) }
     var selectionResetTick by remember { mutableStateOf(0) }
     // Copy turns the bubble itself into selectable text (all of it selected) instead of opening a
@@ -343,7 +352,10 @@ fun ChatScreen(
     // Reaction SMS ("Reacted 👍 to …") are attached to the message they quote, never shown as a
     // bubble of their own. Computed on the merged list so paging cannot split a reaction from its
     // target.
-    val foldedMessages = remember(state.messages) { foldSmsReactions(state.messages) }
+    val visibleMessages = remember(state.messages, state.pendingDeleteIds) {
+        state.messages.filter { it.id !in state.pendingDeleteIds }
+    }
+    val foldedMessages = remember(visibleMessages) { foldSmsReactions(visibleMessages) }
     var reactionPickerMessageId by remember { mutableStateOf<Long?>(null) }
     val onShowInfoForSelected = remember(viewModel) {
         {
@@ -393,7 +405,7 @@ fun ChatScreen(
                 SelectionTopBar(
                     selectedCount = selectedMessageIds.size,
                     selectedIds = selectedMessageIds,
-                    messages = state.messages,
+                    messages = visibleMessages,
                     onClose = { viewModel.clearSelection() },
                     onMarkRead = { viewModel.markSelectedMessagesRead() },
                     onShare = { bodies ->
@@ -422,7 +434,15 @@ fun ChatScreen(
                         }
                         viewModel.clearSelection()
                     },
-                    onDelete = { showBatchDeleteConfirmDialog = true },
+                    deleteArmed = selectionDeleteArmed,
+                    onDelete = {
+                        if (selectionDeleteArmed) {
+                            selectionDeleteArmed = false
+                            onDeleteSelected()
+                        } else {
+                            selectionDeleteArmed = true
+                        }
+                    },
                     onCopy = { bodies ->
                         if (bodies.isNotEmpty()) copyToClipboard(bodies.joinToString("\n\n"))
                         viewModel.clearSelection()
@@ -478,6 +498,12 @@ fun ChatScreen(
                         }
                     },
                     actions = {
+                        // The one undo affordance: visible for 20 seconds after any deletion in
+                        // this conversation, then gone on its own.
+                        UndoIconButton(
+                            available = undoAvailable,
+                            onClick = { viewModel.undoPendingDeletions() }
+                        )
                         // Call Button (visible only if sender address is a callable phone number)
                         if (ContactUtils.isCallable(state.address)) {
                             Surface(
@@ -693,6 +719,7 @@ fun ChatScreen(
                     onLongClick = onLongClickMessage,
                     isSelectionMode = isSelectionMode,
                     selectedMessageIds = selectedMessageIds,
+                    showNewSpam = state.showNewSpam,
                     onTapMessage = onTapMessage,
                     onTapBubble = { message ->
                         deleteArmed = false
@@ -1063,53 +1090,6 @@ fun ChatScreen(
         )
     }
 
-    if (showBatchDeleteConfirmDialog) {
-        val count = selectedMessageIds.size
-        AlertDialog(
-            onDismissRequest = { showBatchDeleteConfirmDialog = false },
-            shape = SquircleCardShape,
-            title = {
-                Text(
-                    text = stringResource(R.string.chat_delete_messages_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.chat_delete_messages_body, count),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showBatchDeleteConfirmDialog = false
-                        onDeleteSelected()
-                    }
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.chat_delete),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "Delete",
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
-                    Text(stringResource(R.string.chat_cancel), fontWeight = FontWeight.SemiBold)
-                }
-            }
-        )
-    }
 }
 
 
@@ -1130,6 +1110,7 @@ private fun ChatMessageList(
     onLongClick: (SmsMessage) -> Unit,
     isSelectionMode: Boolean = false,
     selectedMessageIds: Set<Long> = emptySet(),
+    showNewSpam: Boolean = true,
     onTapMessage: (SmsMessage) -> Unit = {},
     /** A single tap on a bubble, which opens the action strip. */
     onTapBubble: (SmsMessage) -> Unit = {},
@@ -1231,7 +1212,8 @@ private fun ChatMessageList(
                         isSelectionMode = isSelectionMode,
                         isSelected = message.id in selectedMessageIds,
                         onLongClick = { onLongClick(message) },
-                        onToggleSelect = { onTapMessage(message) }
+                        onToggleSelect = { onTapMessage(message) },
+                        showNewSpam = showNewSpam
                     )
                 } else {
                     val isTargetOfReset = (activeTextBubbleId == message.id)
@@ -1313,6 +1295,7 @@ private fun SelectionTopBar(
     onMarkRead: () -> Unit,
     onShare: (List<String>) -> Unit,
     onForward: (List<String>) -> Unit,
+    deleteArmed: Boolean = false,
     onDelete: () -> Unit,
     onCopy: (List<String>) -> Unit,
     onInfo: () -> Unit,
@@ -1351,7 +1334,7 @@ private fun SelectionTopBar(
             IconButton(onClick = { onShare(selectedBodies) }) {
                 Icon(
                     // Same glyph as the strip, so "share" looks like one thing across the app.
-                    imageVector = RameshIcons.Share,
+                    imageVector = Icons.Default.Share,
                     contentDescription = stringResource(R.string.chat_menu_share)
                 )
             }
@@ -1360,14 +1343,23 @@ private fun SelectionTopBar(
                 enabled = selectedBodies.isNotEmpty()
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Forward,
+                    imageVector = RameshIcons.Forward,
                     contentDescription = stringResource(R.string.chat_menu_forward)
                 )
             }
+            // Two-step delete, same as the strip: the bin fills in and turns red when armed, and
+            // the second tap deletes. Nothing else is asked.
             IconButton(onClick = onDelete) {
                 Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = stringResource(R.string.chat_delete_selected)
+                    imageVector = if (deleteArmed) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                    contentDescription = stringResource(
+                        if (deleteArmed) R.string.chat_delete_again else R.string.chat_delete_selected
+                    ),
+                    tint = if (deleteArmed) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onPrimary
+                    }
                 )
             }
             Box {

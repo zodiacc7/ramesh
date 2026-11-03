@@ -1579,8 +1579,12 @@ class SmsRepository(
     suspend fun createTab(
         name: String,
         addresses: Collection<String> = emptyList(),
-        filterMask: Int = 0
-    ): Long = dbHelper.createTab(name, addresses, filterMask)
+        filterMask: Int = 0,
+        sortOrder: Int? = null
+    ): Long = dbHelper.createTab(name, addresses, filterMask, sortOrder)
+
+    /** Moves existing tabs down so the built-in Contacts / Other / Spam tabs can sit in front. */
+    suspend fun shiftTabSortOrders(delta: Int): Boolean = dbHelper.shiftTabSortOrders(delta)
 
     suspend fun updateTabFilterMask(tabId: Long, filterMask: Int): Boolean =
         dbHelper.updateTabFilterMask(tabId, filterMask)
