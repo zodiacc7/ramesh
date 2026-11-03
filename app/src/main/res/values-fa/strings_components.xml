@@ -48,4 +48,5 @@
     <string name="comp_hide">پنهان</string>
     <string name="inbox_spam_with_new">اسپم %1$d</string>
     <string name="comp_new">جدید</string>
+    <string name="comp_delete_again">دوباره بزنید</string>
 </resources>

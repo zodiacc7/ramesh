@@ -30,4 +30,7 @@
     <string name="tab_none_yet">No tabs created yet</string>
     <string name="tab_none_hint">Tap \'New Tab\' above to create one.</string>
     <string name="tab_sender_count">%1$d senders</string>
+    <string name="tab_builtin_contacts">Contacts</string>
+    <string name="tab_builtin_other">Other</string>
+    <string name="tab_builtin_spam">Spam</string>
 </resources>

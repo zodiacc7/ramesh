@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 
 interface UserPreferences {
-    var showContactsOnly: Boolean
+    /** Whether freshly filtered spam is marked as new in the inbox and inside the conversation. */
+    var showNewSpam: Boolean
+
+    /** Set once the built-in Contacts / Other / Spam tabs have been created. */
+    var defaultTabsSeeded: Boolean
     var showShamsiDate: Boolean
     var enableDateTapShamsiToggle: Boolean
     var showNotificationDeleteAction: Boolean
@@ -46,10 +50,16 @@ class AppPreferences(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     )
 
-    override var showContactsOnly: Boolean
-        get() = prefs.getBoolean(KEY_SHOW_CONTACTS_ONLY, false)
+    override var showNewSpam: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_NEW_SPAM, true)
         set(value) {
-            prefs.edit().putBoolean(KEY_SHOW_CONTACTS_ONLY, value).apply()
+            prefs.edit().putBoolean(KEY_SHOW_NEW_SPAM, value).apply()
+        }
+
+    override var defaultTabsSeeded: Boolean
+        get() = prefs.getBoolean(KEY_DEFAULT_TABS_SEEDED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_DEFAULT_TABS_SEEDED, value).apply()
         }
 
     override var showShamsiDate: Boolean
@@ -89,7 +99,9 @@ class AppPreferences(
         }
 
     override var allTabIndex: Int
-        get() = prefs.getInt(KEY_ALL_TAB_INDEX, 0)
+        // Contacts and Other sit in front of All, so the strip opens as
+        // Contacts | Other | All | Spam on a fresh install.
+        get() = prefs.getInt(KEY_ALL_TAB_INDEX, 2)
         set(value) {
             prefs.edit().putInt(KEY_ALL_TAB_INDEX, value).apply()
         }
@@ -138,7 +150,8 @@ class AppPreferences(
 
     companion object {
         const val PREFS_NAME = "ramesh_preferences"
-        const val KEY_SHOW_CONTACTS_ONLY = "show_contacts_only"
+        const val KEY_SHOW_NEW_SPAM = "show_new_spam"
+        const val KEY_DEFAULT_TABS_SEEDED = "default_tabs_seeded"
         const val KEY_SHOW_SHAMSI_DATE = "show_shamsi_date"
         const val KEY_ENABLE_DATE_TAP_SHAMSI_TOGGLE = "enable_date_tap_shamsi_toggle"
         const val KEY_SHOW_NOTIFICATION_DELETE_ACTION = "show_notification_delete_action"

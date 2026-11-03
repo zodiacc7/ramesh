@@ -40,4 +40,8 @@
     <string name="chat_select_all">Select all</string>
     <string name="chat_mark_read">Mark as read</string>
     <string name="chat_menu_more">More</string>
+    <string name="chat_forward_search">Search contacts or numbers</string>
+    <string name="chat_forward_no_match">No contact matches this search</string>
+    <string name="chat_delete_again">Tap the bin again to delete</string>
+    <string name="chat_undo_deleted">Deleted — tap to undo</string>
 </resources>

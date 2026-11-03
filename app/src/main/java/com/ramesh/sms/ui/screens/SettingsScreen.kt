@@ -558,12 +558,14 @@ fun SettingsScreen(
                         onCheckedChange = { enabled -> update { it.copy(showInboxAvatars = enabled) } },
                         showDivider = true
                     )
+                    // "Contacts only" used to live here and in the inbox top bar; both are gone,
+                    // because Contacts is now a tab of its own.
                     SettingsSwitchRow(
                         icon = Icons.Default.Shield,
-                        title = stringResource(R.string.settings_contacts_only),
-                        subtitle = stringResource(R.string.settings_contacts_only_sub),
-                        checked = inboxState.showContactsOnly,
-                        onCheckedChange = { inboxViewModel.toggleContactsOnly() }
+                        title = stringResource(R.string.settings_new_spam),
+                        subtitle = stringResource(R.string.settings_new_spam_sub),
+                        checked = inboxState.showNewSpam,
+                        onCheckedChange = { inboxViewModel.setShowNewSpamEnabled(it) }
                     )
                 }
             }

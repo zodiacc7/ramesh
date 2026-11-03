@@ -28,6 +28,11 @@ class AppPreferencesTest {
                     val defValue = args[1] as Boolean
                     storage[key] as? Boolean ?: defValue
                 }
+                "getInt" -> {
+                    val key = args!![0] as String
+                    val defValue = args[1] as Int
+                    storage[key] as? Int ?: defValue
+                }
                 "edit" -> createEditorProxy()
                 else -> throw UnsupportedOperationException("Method ${method.name} not implemented in test stub")
             }
@@ -41,6 +46,12 @@ class AppPreferencesTest {
                     "putBoolean" -> {
                         val key = editorArgs!![0] as String
                         val value = editorArgs[1] as Boolean
+                        pendingChanges[key] = value
+                        editorProxy
+                    }
+                    "putInt" -> {
+                        val key = editorArgs!![0] as String
+                        val value = editorArgs[1] as Int
                         pendingChanges[key] = value
                         editorProxy
                     }
@@ -61,34 +72,43 @@ class AppPreferencesTest {
     }
 
     @Test
-    fun defaultShowContactsOnlyIsFalse() {
+    fun defaultShowNewSpamIsTrue() {
         val fakePrefs = InMemorySharedPreferences()
         val appPreferences = AppPreferences(fakePrefs.proxy)
 
-        assertFalse(appPreferences.showContactsOnly)
+        assertTrue(appPreferences.showNewSpam)
     }
 
     @Test
-    fun showContactsOnlyPersistsWhenSet() {
+    fun showNewSpamPersistsWhenSet() {
         val fakePrefs = InMemorySharedPreferences()
         val appPreferences = AppPreferences(fakePrefs.proxy)
 
-        appPreferences.showContactsOnly = true
-        assertTrue(appPreferences.showContactsOnly)
-        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY])
+        appPreferences.showNewSpam = false
+        assertFalse(appPreferences.showNewSpam)
+        assertEquals(false, fakePrefs.storage[AppPreferences.KEY_SHOW_NEW_SPAM])
 
-        appPreferences.showContactsOnly = false
-        assertFalse(appPreferences.showContactsOnly)
-        assertEquals(false, fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY])
+        appPreferences.showNewSpam = true
+        assertTrue(appPreferences.showNewSpam)
+        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_SHOW_NEW_SPAM])
     }
 
     @Test
-    fun showContactsOnlyInitializesFromExistingStoredValue() {
+    fun builtInTabsAreSeededOnlyOnce() {
         val fakePrefs = InMemorySharedPreferences()
-        fakePrefs.storage[AppPreferences.KEY_SHOW_CONTACTS_ONLY] = true
-
         val appPreferences = AppPreferences(fakePrefs.proxy)
-        assertTrue(appPreferences.showContactsOnly)
+
+        assertFalse(appPreferences.defaultTabsSeeded)
+        appPreferences.defaultTabsSeeded = true
+        assertEquals(true, fakePrefs.storage[AppPreferences.KEY_DEFAULT_TABS_SEEDED])
+    }
+
+    @Test
+    fun defaultAllTabIndexLeavesRoomForContactsAndOther() {
+        val fakePrefs = InMemorySharedPreferences()
+        val appPreferences = AppPreferences(fakePrefs.proxy)
+
+        assertEquals(2, appPreferences.allTabIndex)
     }
 
     @Test

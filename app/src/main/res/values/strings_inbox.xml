@@ -20,8 +20,6 @@
     <string name="inbox_marked_read_count">Marked %1$d conversations as read</string>
     <string name="inbox_all_marked_read">All conversations marked as read</string>
     <string name="inbox_all_already_read">All conversations are already read</string>
-    <string name="inbox_showing_contacts_only">Showing contacts only</string>
-    <string name="inbox_showing_all">Showing all conversations</string>
     <string name="inbox_deleted_count">Deleted %1$d conversations</string>
     <string name="inbox_added_to_tab_count">Added %1$d conversations to the tab</string>
     <string name="inbox_tab_created">Created tab %1$s</string>
@@ -38,4 +36,6 @@
     <string name="inbox_empty_snippet">No messages</string>
     <string name="inbox_search_hint">Search conversations or numbers...</string>
     <string name="inbox_close_search">Close search</string>
+    <string name="inbox_delete_again">Tap the bin again to delete</string>
+    <string name="inbox_undo_deleted">Deleted — tap to undo</string>
 </resources>

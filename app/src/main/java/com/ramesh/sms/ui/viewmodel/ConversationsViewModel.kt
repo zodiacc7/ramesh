@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ramesh.sms.R
 import com.ramesh.sms.data.db.RameshDatabaseHelper
 import com.ramesh.sms.data.model.ConversationThread
 import com.ramesh.sms.data.model.SearchMessageResult
@@ -46,7 +47,6 @@ data class ConversationsUiState(
     val filteredThreads: List<ConversationThread> = emptyList(),
     val matchingMessages: List<SearchMessageResult> = emptyList(),
     val searchQuery: String = "",
-    val showContactsOnly: Boolean = false,
     val isDefaultSmsApp: Boolean = false,
     val hasSmsPermission: Boolean = true,
     val error: String? = null,
@@ -79,6 +79,12 @@ data class ConversationsUiState(
     val allTabIndex: Int = 0,
     /** Conversations waiting out the undo window before they are really deleted. */
     val pendingDeleteIds: Set<Long> = emptySet(),
+    /** Tabs waiting out the undo window before they are really deleted. */
+    val pendingDeleteTabIds: Set<Long> = emptySet(),
+    /** When the current undo window closes; 0 when nothing is waiting. */
+    val undoUntil: Long = 0L,
+    /** Whether freshly filtered spam is marked as new (Settings toggle). */
+    val showNewSpam: Boolean = true,
     /** Changes whenever a delete request came back from the provider empty handed. */
     val deleteFailureTick: Long = 0L
 )
@@ -86,8 +92,8 @@ data class ConversationsUiState(
 /** Id used for the "All" pseudo tab while reordering the tab strip (matches ALL_TAB_ID). */
 const val ALL_TAB_SENTINEL = -1L
 
-/** How long a deleted conversation can be brought back. */
-const val UNDO_DELETE_WINDOW_MILLIS = 5_000L
+/** How long a deletion can be undone. The top bar shows the undo icon for this long. */
+const val UNDO_DELETE_WINDOW_MILLIS = 20_000L
 
 class ConversationsViewModel(
     application: Application,
@@ -100,6 +106,7 @@ class ConversationsViewModel(
     private val dbHelper = RameshDatabaseHelper.getInstance(application)
     private var searchJob: Job? = null
     private val pendingDeletes = mutableMapOf<Long, Job>()
+    private val pendingTabDeletes = mutableMapOf<Long, Job>()
     private val refreshScheduler = RefreshScheduler(viewModelScope) { refreshThreads() }
     private var defaultSmsCheckJob: Job? = null
     private var observerDebounceJob: Job? = null
@@ -110,7 +117,6 @@ class ConversationsViewModel(
 
     private val _uiState = MutableStateFlow(
         ConversationsUiState(
-            showContactsOnly = userPreferences.showContactsOnly,
             enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle,
             showNotificationDeleteAction = userPreferences.showNotificationDeleteAction,
             showTabs = userPreferences.showTabs,
@@ -124,6 +130,7 @@ class ConversationsViewModel(
             allTabIndex = userPreferences.allTabIndex,
             showSimBadge = userPreferences.showSimBadge,
             jalaliScope = userPreferences.jalaliScope,
+            showNewSpam = userPreferences.showNewSpam,
             useShamsiInLists = showsJalaliDates(
                 userPreferences.jalaliScope,
                 userPreferences.showShamsiDate
@@ -138,6 +145,7 @@ class ConversationsViewModel(
 
     init {
         registerSmsContentObserver()
+        seedBuiltInTabs()
         loadTabs()
         loadThreads()
         viewModelScope.launch {
@@ -175,6 +183,71 @@ class ConversationsViewModel(
         }
     }
 
+    /**
+     * Creates the three built-in tabs the inbox is supposed to start with:
+     * Contacts (only contacts), Other (unknown senders that are not spam) and Spam (spam only).
+     *
+     * "All" is not a database row - it is a pseudo tab drawn at [allTabIndex] - so the order
+     * Contacts | Other | All | Spam comes from putting All at index 2. Runs once: a user who
+     * deletes one of them does not get it back on the next launch.
+     */
+    private fun seedBuiltInTabs() {
+        if (userPreferences.defaultTabsSeeded) return
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            // Anything the user already had keeps its order, but after the built-ins.
+            repository.shiftTabSortOrders(3)
+            repository.createTab(
+                name = app.getString(R.string.tab_builtin_contacts),
+                filterMask = SenderTab.MASK_CONTACTS_ONLY,
+                sortOrder = 0
+            )
+            repository.createTab(
+                name = app.getString(R.string.tab_builtin_other),
+                filterMask = SenderTab.MASK_NON_CONTACTS_ONLY or SenderTab.MASK_NON_SPAM_ONLY,
+                sortOrder = 1
+            )
+            repository.createTab(
+                name = app.getString(R.string.tab_builtin_spam),
+                filterMask = SenderTab.MASK_SPAM_ONLY,
+                sortOrder = 2
+            )
+            userPreferences.defaultTabsSeeded = true
+            userPreferences.allTabIndex = 2
+            _uiState.value = _uiState.value.copy(allTabIndex = 2)
+            loadTabs()
+        }
+    }
+
+    /**
+     * Opens (and refreshes) the undo window.
+     *
+     * Every deletion in the app shares one window: the top bar shows a single undo icon for
+     * [UNDO_DELETE_WINDOW_MILLIS] and it brings back everything deleted inside that window.
+     */
+    private fun openUndoWindow() {
+        _uiState.value = _uiState.value.copy(
+            undoUntil = System.currentTimeMillis() + UNDO_DELETE_WINDOW_MILLIS
+        )
+    }
+
+    /** Brings back every conversation and tab waiting out the undo window. */
+    fun undoPendingDeletions() {
+        val pendingThreads = _uiState.value.pendingDeleteIds
+        val pendingTabs = _uiState.value.pendingDeleteTabIds
+        pendingThreads.forEach { pendingDeletes.remove(it)?.cancel() }
+        pendingTabs.forEach { pendingTabDeletes.remove(it)?.cancel() }
+        _uiState.value = _uiState.value.copy(
+            pendingDeleteIds = emptySet(),
+            pendingDeleteTabIds = emptySet(),
+            undoUntil = 0L
+        )
+        if (pendingTabs.isNotEmpty()) {
+            // The tab rows are only hidden while they wait; reloading brings them back.
+            loadTabs()
+        }
+    }
+
     fun onInboxResumed() {
         _uiState.value = _uiState.value.copy(
             enableDateTapShamsiToggle = userPreferences.enableDateTapShamsiToggle,
@@ -190,6 +263,7 @@ class ConversationsViewModel(
             allTabIndex = userPreferences.allTabIndex,
             showSimBadge = userPreferences.showSimBadge,
             jalaliScope = userPreferences.jalaliScope,
+            showNewSpam = userPreferences.showNewSpam,
             useShamsiInLists = showsJalaliDates(
                 userPreferences.jalaliScope,
                 userPreferences.showShamsiDate
@@ -383,8 +457,7 @@ class ConversationsViewModel(
         tabs: List<SenderTab> = _uiState.value.tabs,
         selectedSimFilterSubId: Int? = _uiState.value.selectedSimFilterSubId,
         showTabs: Boolean = _uiState.value.showTabs,
-        showSimFilter: Boolean = _uiState.value.showSimFilter,
-        showContactsOnly: Boolean = _uiState.value.showContactsOnly
+        showSimFilter: Boolean = _uiState.value.showSimFilter
     ): List<ConversationThread> {
         val tab = if (showTabs && selectedTabId != null) tabs.find { it.id == selectedTabId } else null
         // A spam-only conversation has no content left to open, so it never becomes an empty row
@@ -401,17 +474,11 @@ class ConversationsViewModel(
         } else {
             usable
         }
-        // "Contacts only" is a scope of the All tab; a custom tab defines its own scope.
-        val contactFiltered = if (tab == null && showContactsOnly) {
-            tabFiltered.filter { it.isContact }
-        } else {
-            tabFiltered
-        }
         val effectiveSubId = if (showSimFilter) selectedSimFilterSubId else null
         val simFiltered = if (effectiveSubId != null) {
-            contactFiltered.filter { it.subId == effectiveSubId }
+            tabFiltered.filter { it.subId == effectiveSubId }
         } else {
-            contactFiltered
+            tabFiltered
         }
         if (query.isBlank()) return simFiltered
         return simFiltered.filter {
@@ -476,22 +543,10 @@ class ConversationsViewModel(
         }
     }
 
-    fun toggleContactsOnly() {
-        // Only the All tab has a "contacts only" scope.
-        val current = _uiState.value
-        if (current.selectedTabId != null) return
-        val nextValue = !current.showContactsOnly
-        userPreferences.showContactsOnly = nextValue
-        _uiState.value = current.copy(
-            showContactsOnly = nextValue,
-            filteredThreads = filterThreads(
-                threads = current.threads,
-                query = current.searchQuery.trim(),
-                selectedTabId = current.selectedTabId,
-                tabs = current.tabs,
-                showContactsOnly = nextValue
-            )
-        )
+    /** Turns the "new spam" marks on or off everywhere in the inbox. */
+    fun setShowNewSpamEnabled(enabled: Boolean) {
+        userPreferences.showNewSpam = enabled
+        _uiState.value = _uiState.value.copy(showNewSpam = enabled)
     }
 
     fun setDateTapShamsiEnabled(enabled: Boolean) {
@@ -636,32 +691,17 @@ class ConversationsViewModel(
         isSelectionMode = false
     }
 
+    /**
+     * Deletes the selection through the same undo window as a single conversation, so the batch
+     * is one undoable action instead of an exception to the rule.
+     */
     fun deleteSelectedConversations(onComplete: (Int) -> Unit = {}) {
         val targetIds = selectedThreadIds.toSet()
         if (targetIds.isEmpty()) return
-
-        viewModelScope.launch {
-            val count = targetIds.size
-            val success = repository.deleteThreads(targetIds)
-            if (!success) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Failed to delete conversations"
-                )
-                onComplete(0)
-                return@launch
-            }
-            val updatedThreads = _uiState.value.threads.filter { it.threadId !in targetIds }
-            val updatedFiltered = _uiState.value.filteredThreads.filter { it.threadId !in targetIds }
-            selectedThreadIds.clear()
-            isSelectionMode = false
-            _uiState.value = _uiState.value.copy(
-                threads = updatedThreads,
-                filteredThreads = updatedFiltered,
-                error = null
-            )
-            repository.saveCachedThreads(updatedThreads)
-            onComplete(count)
-        }
+        targetIds.forEach { requestDeleteConversation(it) }
+        selectedThreadIds.clear()
+        isSelectionMode = false
+        onComplete(targetIds.size)
     }
 
     fun markSelectedConversationsRead(onComplete: (Int) -> Unit = {}) {
@@ -837,6 +877,7 @@ class ConversationsViewModel(
         val current = _uiState.value
         if (threadId in current.pendingDeleteIds) return
         _uiState.value = current.copy(pendingDeleteIds = current.pendingDeleteIds + threadId)
+        openUndoWindow()
         pendingDeletes.remove(threadId)?.cancel()
         pendingDeletes[threadId] = viewModelScope.launch {
             delay(UNDO_DELETE_WINDOW_MILLIS)
@@ -862,12 +903,35 @@ class ConversationsViewModel(
         pendingDeletes.remove(threadId)?.cancel()
         val current = _uiState.value
         if (threadId in current.pendingDeleteIds) {
-            _uiState.value = current.copy(pendingDeleteIds = current.pendingDeleteIds - threadId)
+            val remaining = current.pendingDeleteIds - threadId
+            _uiState.value = current.copy(
+                pendingDeleteIds = remaining,
+                undoUntil = if (remaining.isEmpty() && current.pendingDeleteTabIds.isEmpty()) {
+                    0L
+                } else {
+                    current.undoUntil
+                }
+            )
         }
     }
 
+    /**
+     * Hides a tab and deletes it after the undo window. The row leaves the strip immediately, so
+     * the first tap of the two-step bin has a visible effect the second one can confirm.
+     */
     fun deleteTab(tabId: Long) {
-        viewModelScope.launch {
+        if (tabId in _uiState.value.pendingDeleteTabIds) return
+        _uiState.value = _uiState.value.copy(
+            pendingDeleteTabIds = _uiState.value.pendingDeleteTabIds + tabId
+        )
+        openUndoWindow()
+        pendingTabDeletes.remove(tabId)?.cancel()
+        pendingTabDeletes[tabId] = viewModelScope.launch {
+            delay(UNDO_DELETE_WINDOW_MILLIS)
+            pendingTabDeletes.remove(tabId)
+            _uiState.value = _uiState.value.copy(
+                pendingDeleteTabIds = _uiState.value.pendingDeleteTabIds - tabId
+            )
             if (_uiState.value.selectedTabId == tabId) {
                 selectTab(null)
             }

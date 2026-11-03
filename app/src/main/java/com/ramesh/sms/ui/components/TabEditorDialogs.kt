@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
@@ -367,6 +368,8 @@ fun TabOptionsSheet(
         rememberModalBottomSheetState(skipPartiallyExpanded = true),
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
+    /** True once the delete row has been armed by a first tap. */
+    deleteArmed: Boolean = false,
     onDelete: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -383,9 +386,12 @@ fun TabOptionsSheet(
                 description = stringResource(R.string.tab_row_edit_desc),
                 onClick = onEdit
             )
+            // The bin fills in on the first tap; the second one deletes the tab. No dialog.
             SheetRow(
-                icon = Icons.Default.Delete,
-                label = stringResource(R.string.tab_row_delete),
+                icon = if (deleteArmed) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                label = stringResource(
+                    if (deleteArmed) R.string.comp_delete_again else R.string.tab_row_delete
+                ),
                 description = null,
                 tint = MaterialTheme.colorScheme.error,
                 onClick = onDelete

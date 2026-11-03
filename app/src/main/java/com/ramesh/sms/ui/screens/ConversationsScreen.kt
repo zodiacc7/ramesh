@@ -42,7 +42,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +55,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
@@ -81,10 +84,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -98,7 +97,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,12 +143,13 @@ import com.ramesh.sms.ui.components.ContactProfileDialog
 import com.ramesh.sms.ui.components.ConversationAvatar
 import com.ramesh.sms.ui.components.CustomizationSheet
 import com.ramesh.sms.ui.components.DefaultSmsBanner
-import com.ramesh.sms.ui.components.DeleteTabDialog
 import com.ramesh.sms.ui.components.SenderTabRow
 import com.ramesh.sms.ui.components.SimBadge
 import com.ramesh.sms.ui.components.SimFilterRow
 import com.ramesh.sms.ui.components.TabEditorDialog
 import com.ramesh.sms.ui.components.TabOptionsSheet
+import com.ramesh.sms.ui.components.UndoIconButton
+import com.ramesh.sms.ui.components.rememberUndoAvailable
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
 import com.ramesh.sms.ui.util.senderDisplayName
@@ -225,15 +224,19 @@ fun ConversationsScreen(
     }
     val hasMultipleSims = state.availableSims.size > 1
 
-    var showBatchDeleteDialog by remember { mutableStateOf(false) }
+    // Two-step delete, no dialogs: the first tap on a bin arms it (filled, red), the second
+    // deletes. One flag per place a bin appears.
+    var selectionDeleteArmed by remember { mutableStateOf(false) }
+    var menuDeleteArmed by remember { mutableStateOf(false) }
+    var tabDeleteArmed by remember { mutableStateOf(false) }
     // null = editor closed, NEW_TAB_ID = creating a tab, otherwise the id of the tab being edited.
     var tabEditorId by remember { mutableStateOf<Long?>(null) }
-    var tabToDelete by remember { mutableStateOf<SenderTab?>(null) }
     var tabForOptionsMenu by remember { mutableStateOf<SenderTab?>(null) }
     var showAddToTabDialog by remember { mutableStateOf(false) }
     var activeProfileDialogInfo by remember { mutableStateOf<ProfileDialogData?>(null) }
     var showCustomizationSheet by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    // Every deletion opens one 20-second undo window in the view model; the icon in the top bar
+    // is the only way back. There is no snackbar undo any more.
     // The search field is hidden behind a magnifier button until the user asks for it. A query
     // that survived a trip to a chat keeps the field open, so results are never shown without it.
     var isSearchOpen by remember { mutableStateOf(state.searchQuery.isNotBlank()) }
@@ -246,7 +249,7 @@ fun ConversationsScreen(
         }
     }
     val swipeToDelete = AppearanceStore.current.swipeToDelete
-    val undoScope = rememberCoroutineScope()
+    val undoAvailable = rememberUndoAvailable(state.undoUntil)
     // Long press opens the same actions the swipe reveals, so they stay reachable on devices
     // where the system back gesture eats edge swipes.
     var threadOptions by remember { mutableStateOf<ConversationThread?>(null) }
@@ -258,25 +261,8 @@ fun ConversationsScreen(
         }
     }
 
-    // Deleting waits five seconds so the undo bar stays usable; nothing is lost if the user
-    // changes their mind.
     val requestDeleteConversation: (ConversationThread) -> Unit = { thread ->
         viewModel.requestDeleteConversation(thread.threadId)
-        undoScope.launch {
-            val dismissJob = launch {
-                delay(UNDO_DELETE_WINDOW_MILLIS)
-                snackbarHostState.currentSnackbarData?.dismiss()
-            }
-            val result = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.inbox_conversation_deleted),
-                actionLabel = context.getString(R.string.inbox_undo),
-                duration = SnackbarDuration.Indefinite
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                dismissJob.cancel()
-                viewModel.undoDeleteConversation(thread.threadId)
-            }
-        }
     }
 
     BackHandler(enabled = isSelectionMode) {
@@ -287,11 +273,14 @@ fun ConversationsScreen(
         isSearchOpen = false
     }
 
-    // "Contacts only" is a filter of the All tab; custom tabs keep their own scope.
-    val contactsOnlyActive = state.showContactsOnly && state.selectedTabId == null
-    val currentlyVisibleThreads = remember(state.filteredThreads, contactsOnlyActive, state.pendingDeleteIds) {
-        val visible = state.filteredThreads.filter { it.threadId !in state.pendingDeleteIds }
-        if (contactsOnlyActive) visible.filter { it.isContact } else visible
+    // Entering a tab always starts at its first conversation: the previous tab's scroll offset
+    // would otherwise drop the user into the middle of a list they have never seen.
+    val inboxListState = rememberLazyListState()
+    LaunchedEffect(state.selectedTabId) {
+        runCatching { inboxListState.scrollToItem(0) }
+    }
+    val currentlyVisibleThreads = remember(state.filteredThreads, state.pendingDeleteIds) {
+        state.filteredThreads.filter { it.threadId !in state.pendingDeleteIds }
     }
     val isDebuggable = remember(context) {
         (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -303,8 +292,8 @@ fun ConversationsScreen(
                 isSelectionMode = isSelectionMode,
                 selectedThreadIds = selectedThreadIds,
                 visibleThreads = currentlyVisibleThreads,
-                showContactsOnly = contactsOnlyActive,
-                showContactsToggle = state.selectedTabId == null,
+                showUndo = undoAvailable,
+                onUndo = { viewModel.undoPendingDeletions() },
                 threads = state.threads,
                 isDebuggable = isDebuggable,
                 onClearSelection = { viewModel.clearSelection() },
@@ -318,19 +307,24 @@ fun ConversationsScreen(
                         ).show()
                     }
                 },
-                onDeleteSelected = { showBatchDeleteDialog = true },
+                deleteArmed = selectionDeleteArmed,
+                onDeleteSelected = {
+                    if (selectionDeleteArmed) {
+                        selectionDeleteArmed = false
+                        viewModel.deleteSelectedConversations { deletedCount ->
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.inbox_deleted_count, deletedCount),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } else {
+                        selectionDeleteArmed = true
+                    }
+                },
                 showTabs = state.showTabs,
                 onAddToTab = { showAddToTabDialog = true },
                 onOpenSearch = { isSearchOpen = true },
-                onToggleContactsOnly = {
-                    viewModel.toggleContactsOnly()
-                    val msg = if (!contactsOnlyActive) {
-                        context.getString(R.string.inbox_showing_contacts_only)
-                    } else {
-                        context.getString(R.string.inbox_showing_all)
-                    }
-                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                },
                 onMarkAllRead = {
                     val hasUnread = state.threads.any { it.unreadCount > 0 }
                     if (hasUnread) {
@@ -369,7 +363,6 @@ fun ConversationsScreen(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { innerPadding ->
         Column(
@@ -460,7 +453,9 @@ fun ConversationsScreen(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 SenderTabRow(
-                    tabs = state.tabs,
+                    // A tab waiting out the undo window has already left the strip; bringing it
+                    // back is the undo button's job.
+                    tabs = state.tabs.filter { it.id !in state.pendingDeleteTabIds },
                     selectedTabId = state.selectedTabId,
                     threads = state.threads,
                     allTabIndex = state.allTabIndex,
@@ -559,13 +554,7 @@ fun ConversationsScreen(
 
             val isSearchActive = state.searchQuery.isNotBlank()
             val displayedThreads = currentlyVisibleThreads
-            val displayedMessages = remember(state.matchingMessages, contactsOnlyActive) {
-                if (contactsOnlyActive) {
-                    state.matchingMessages.filter { !it.contactName.isNullOrBlank() }
-                } else {
-                    state.matchingMessages
-                }
-            }
+            val displayedMessages = state.matchingMessages
 
             if (state.isLoading && state.threads.isEmpty()) {
                 Box(
@@ -608,14 +597,14 @@ fun ConversationsScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = if (contactsOnlyActive) "No contact messages match \"${state.searchQuery}\"" else "No messages match \"${state.searchQuery}\"",
+                                text = "No messages match \"${state.searchQuery}\"",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (contactsOnlyActive) "Try a different keyword or toggle off the contacts filter" else "Try searching for a different keyword or contact name",
+                                text = "Try searching for a different keyword or contact name",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -623,6 +612,7 @@ fun ConversationsScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = inboxListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = ListBottomFabPadding)
                     ) {
@@ -647,6 +637,7 @@ fun ConversationsScreen(
                                         thread = thread,
                                         selectedIds = NoSelectionIds,
                                         isSelectionMode = false,
+                                        showNewSpam = state.showNewSpam,
                                         simSlotNumber = if (hasMultipleSims && state.showSimBadge) simSlotMap[thread.subId] else null,
                                         useShamsi = state.useShamsiInLists,
                                         appLanguage = state.appLanguage,
@@ -750,7 +741,6 @@ fun ConversationsScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = if (selectedTab != null) Icons.Default.FolderOpen
-                                    else if (contactsOnlyActive) Icons.Default.Contacts
                                     else Icons.Default.Shield,
                                     contentDescription = stringResource(R.string.inbox_no_messages),
                                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
@@ -761,7 +751,6 @@ fun ConversationsScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (selectedTab != null) "No conversations in \"${selectedTab.name}\""
-                            else if (contactsOnlyActive) "No contacts found"
                             else "No SMS messages found",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
@@ -776,7 +765,6 @@ fun ConversationsScreen(
                                     "None of the senders in this tab have messages in your inbox"
                                 }
                             }
-                            else if (contactsOnlyActive) "Conversations with saved contacts will appear here"
                             else "Incoming SMS messages will appear here",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
@@ -797,6 +785,8 @@ fun ConversationsScreen(
             } else {
                 ConversationsInboxList(
                     threads = displayedThreads,
+                    listState = inboxListState,
+                    showNewSpam = state.showNewSpam,
                     selectedIds = selectedThreadIds,
                     isSelectionMode = isSelectionMode,
                     simSlotMap = simSlotMap,
@@ -824,6 +814,15 @@ fun ConversationsScreen(
         }
     }
 
+    LaunchedEffect(threadOptions) {
+        if (threadOptions == null) menuDeleteArmed = false
+    }
+    LaunchedEffect(isSelectionMode) {
+        if (!isSelectionMode) selectionDeleteArmed = false
+    }
+    LaunchedEffect(tabForOptionsMenu) {
+        if (tabForOptionsMenu == null) tabDeleteArmed = false
+    }
     threadOptions?.let { thread ->
         val optionsTitle = senderDisplayName(thread.contactName, thread.address)
         AlertDialog(
@@ -847,13 +846,26 @@ fun ConversationsScreen(
                         threadOptions = null
                         viewModel.clearUnreadForThread(thread.threadId)
                     }
+                    // Same two-step bin: the row turns into a filled bin on the first tap and only
+                    // the second one deletes.
                     ConversationActionRow(
-                        icon = Icons.Default.Delete,
-                        label = stringResource(R.string.inbox_delete_conversation),
+                        icon = if (menuDeleteArmed) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                        label = stringResource(
+                            if (menuDeleteArmed) {
+                                R.string.inbox_delete_again
+                            } else {
+                                R.string.inbox_delete_conversation
+                            }
+                        ),
                         isDestructive = true
                     ) {
-                        threadOptions = null
-                        requestDeleteConversation(thread)
+                        if (menuDeleteArmed) {
+                            threadOptions = null
+                            menuDeleteArmed = false
+                            requestDeleteConversation(thread)
+                        } else {
+                            menuDeleteArmed = true
+                        }
                     }
                     ConversationActionRow(
                         icon = Icons.Default.SelectAll,
@@ -869,21 +881,6 @@ fun ConversationsScreen(
                     Text(stringResource(R.string.inbox_cancel))
                 }
             }
-        )
-    }
-
-    if (showBatchDeleteDialog) {
-        BatchDeleteConversationsDialog(
-            selectedThreadIds = selectedThreadIds,
-            onDismiss = { showBatchDeleteDialog = false },
-            onConfirm = { deletedCount ->
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.inbox_deleted_count, deletedCount),
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            onDelete = { onComplete -> viewModel.deleteSelectedConversations(onComplete) }
         )
     }
 
@@ -925,25 +922,20 @@ fun ConversationsScreen(
                 tabEditorId = tab.id
                 tabForOptionsMenu = null
             },
+            deleteArmed = tabDeleteArmed,
             onDelete = {
-                tabToDelete = tab
-                tabForOptionsMenu = null
-            }
-        )
-    }
-
-    tabToDelete?.let { tab ->
-        DeleteTabDialog(
-            tabName = tab.name,
-            onDismiss = { tabToDelete = null },
-            onConfirm = {
-                viewModel.deleteTab(tab.id)
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.inbox_tab_deleted, tab.name),
-                    Toast.LENGTH_SHORT
-                ).show()
-                tabToDelete = null
+                if (tabDeleteArmed) {
+                    viewModel.deleteTab(tab.id)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.inbox_tab_deleted, tab.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    tabDeleteArmed = false
+                    tabForOptionsMenu = null
+                } else {
+                    tabDeleteArmed = true
+                }
             }
         )
     }
@@ -1028,18 +1020,18 @@ private fun ConversationsTopBar(
     isSelectionMode: Boolean,
     selectedThreadIds: Set<Long>,
     visibleThreads: List<ConversationThread>,
-    showContactsOnly: Boolean,
-    showContactsToggle: Boolean = true,
+    showUndo: Boolean = false,
+    onUndo: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     threads: List<ConversationThread>,
     isDebuggable: Boolean,
     onClearSelection: () -> Unit,
     onSelectAll: () -> Unit,
     onMarkSelectedRead: () -> Unit,
+    deleteArmed: Boolean = false,
     onDeleteSelected: () -> Unit,
     showTabs: Boolean = true,
     onAddToTab: () -> Unit = {},
-    onToggleContactsOnly: () -> Unit,
     onMarkAllRead: () -> Unit,
     onNavigateToTestLab: () -> Unit,
     onNavigateToFilterStudio: () -> Unit,
@@ -1095,10 +1087,17 @@ private fun ConversationsTopBar(
                     )
                 }
 
+                // Two-step delete: the bin fills in when armed and the second tap deletes.
                 IconButton(onClick = onDeleteSelected) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.inbox_delete_selected),
+                        imageVector = if (deleteArmed) {
+                            Icons.Default.Delete
+                        } else {
+                            Icons.Default.DeleteOutline
+                        },
+                        contentDescription = stringResource(
+                            if (deleteArmed) R.string.inbox_delete_again else R.string.inbox_delete_selected
+                        ),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -1128,16 +1127,9 @@ private fun ConversationsTopBar(
                 }
             },
             actions = {
-                val contactsButtonBg by animateColorAsState(
-                    targetValue = if (showContactsOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    animationSpec = spring(),
-                    label = "contactsToggleBg"
-                )
-                val contactsIconTint by animateColorAsState(
-                    targetValue = if (showContactsOnly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                    animationSpec = spring(),
-                    label = "contactsToggleTint"
-                )
+                // The one undo affordance of the inbox: it stays for 20 seconds after any
+                // deletion (conversations, batches, tabs) and then removes itself.
+                UndoIconButton(available = showUndo, onClick = onUndo)
 
                 Surface(
                     shape = CircleShape,
@@ -1149,22 +1141,6 @@ private fun ConversationsTopBar(
                             contentDescription = stringResource(R.string.inbox_search),
                             tint = MaterialTheme.colorScheme.primary
                         )
-                    }
-                }
-
-                if (showContactsToggle) {
-                    Surface(
-                        shape = CircleShape,
-                        color = contactsButtonBg,
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        IconButton(onClick = onToggleContactsOnly) {
-                            Icon(
-                                imageVector = Icons.Default.Contacts,
-                                contentDescription = if (showContactsOnly) "Showing contacts only (Tap to show all)" else "Filter by contacts only",
-                                tint = contactsIconTint
-                            )
-                        }
                     }
                 }
 
@@ -1253,6 +1229,8 @@ private fun ConversationsTopBar(
 @Composable
 private fun ConversationsInboxList(
     threads: List<ConversationThread>,
+    listState: LazyListState = rememberLazyListState(),
+    showNewSpam: Boolean = true,
     selectedIds: Set<Long>,
     isSelectionMode: Boolean,
     simSlotMap: Map<Int, Int> = emptyMap(),
@@ -1270,6 +1248,7 @@ private fun ConversationsInboxList(
     val showAvatars = AppearanceStore.current.showInboxAvatars
     val swipeEnabled = AppearanceStore.current.swipeToDelete
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = ListBottomFabPadding)
     ) {
@@ -1288,6 +1267,7 @@ private fun ConversationsInboxList(
                     selectedIds = selectedIds,
                     isSelectionMode = isSelectionMode,
                     showAvatar = showAvatars,
+                    showNewSpam = showNewSpam,
                     simSlotNumber = if (hasMultipleSims && showSimBadge) simSlotMap[thread.subId] else null,
                     useShamsi = useShamsi,
                     appLanguage = appLanguage,
@@ -1330,52 +1310,6 @@ private fun ConversationsInboxList(
 }
 
 @Composable
-private fun BatchDeleteConversationsDialog(
-    selectedThreadIds: Set<Long>,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
-    onDelete: ((Int) -> Unit) -> Unit
-) {
-    val count = selectedThreadIds.size
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(R.string.inbox_delete_confirm_title, count),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.inbox_delete_confirm_body, count),
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onDismiss()
-                    onDelete { deletedCount -> onConfirm(deletedCount) }
-                }
-            ) {
-                Text(
-                    stringResource(R.string.inbox_delete),
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.inbox_cancel))
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
 private fun ConversationItem(
     thread: ConversationThread,
     selectedIds: Set<Long>,
@@ -1386,6 +1320,8 @@ private fun ConversationItem(
     simSlotNumber: Int? = null,
     useShamsi: Boolean = false,
     appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    /** Whether unopened spam is marked new (Settings switch). */
+    showNewSpam: Boolean = true,
     onAvatarClick: (() -> Unit)? = null
 ) {
     val isSelected by remember(thread.threadId) {
@@ -1555,7 +1491,7 @@ private fun ConversationItem(
                 // unread, so the number in the badge can be traced to rows here.
                 if (showsSpam && !isSelectionMode) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    SpamChip(newCount = thread.newSpamCount)
+                    SpamChip(newCount = if (showNewSpam) thread.newSpamCount else 0)
                 }
 
                 if (thread.unreadCount > 0 && !isSelectionMode && !thread.isUnreadSpam) {
@@ -1856,6 +1792,11 @@ private fun SwipeToDeleteContainer(
         label = "swipeReveal"
     )
     val revealed = abs(animatedOffset) > 1f
+    // The revealed bin arms itself on the first tap, exactly like the one in the strip.
+    var deleteArmed by remember { mutableStateOf(false) }
+    LaunchedEffect(revealed) {
+        if (!revealed) deleteArmed = false
+    }
     // Negative offset slides the row towards the physical left, so the exposed strip sits on the
     // physical right. Alignment.End/Start are direction aware, therefore the mapping flips in RTL.
     val showDelete = animatedOffset < 0f
@@ -1894,15 +1835,33 @@ private fun SwipeToDeleteContainer(
                 ) {
                     IconButton(
                         onClick = {
-                            targetOffset = 0f
-                            if (showDelete) onDelete() else onMarkRead()
+                            when {
+                                !showDelete -> {
+                                    targetOffset = 0f
+                                    onMarkRead()
+                                }
+                                deleteArmed -> {
+                                    deleteArmed = false
+                                    targetOffset = 0f
+                                    onDelete()
+                                }
+                                else -> deleteArmed = true
+                            }
                         },
                         modifier = Modifier.size(52.dp)
                     ) {
                         Icon(
-                            imageVector = if (showDelete) Icons.Default.Delete else Icons.Default.MarkChatRead,
+                            imageVector = when {
+                                !showDelete -> Icons.Default.MarkChatRead
+                                deleteArmed -> Icons.Default.Delete
+                                else -> Icons.Default.DeleteOutline
+                            },
                             contentDescription = stringResource(
-                                if (showDelete) R.string.inbox_delete_conversation else R.string.inbox_mark_read
+                                when {
+                                    !showDelete -> R.string.inbox_mark_read
+                                    deleteArmed -> R.string.inbox_delete_again
+                                    else -> R.string.inbox_delete_conversation
+                                }
                             ),
                             tint = onContainer,
                             modifier = Modifier.size(24.dp)

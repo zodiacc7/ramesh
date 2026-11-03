@@ -1046,10 +1046,26 @@ class RameshDatabaseHelper private constructor(context: Context) :
         tabs
     }
 
+    /**
+     * Moves every existing tab [delta] places down the strip.
+     *
+     * Used once, when the built-in tabs are created in front of whatever tabs the user already
+     * had: it keeps their order intact instead of interleaving the new tabs with theirs.
+     */
+    suspend fun shiftTabSortOrders(delta: Int): Boolean = withContext(Dispatchers.IO) {
+        if (delta == 0) return@withContext true
+        val db = writableDatabase
+        db.execSQL("UPDATE sender_tabs SET sort_order = sort_order + ?", arrayOf<Any>(delta))
+        _tabsChanged.value = System.currentTimeMillis()
+        true
+    }
+
     suspend fun createTab(
         name: String,
         addresses: Collection<String> = emptyList(),
-        filterMask: Int = 0
+        filterMask: Int = 0,
+        /** Explicit position in the strip; null appends the tab at the end. */
+        sortOrder: Int? = null
     ): Long =
         withContext(Dispatchers.IO) {
             val trimmed = name.trim()
@@ -1059,10 +1075,12 @@ class RameshDatabaseHelper private constructor(context: Context) :
             var tabId = -1L
             db.beginTransaction()
             try {
-                var nextOrder = 0
-                db.rawQuery("SELECT MAX(sort_order) FROM sender_tabs", null).use { cursor ->
-                    if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                        nextOrder = cursor.getInt(0) + 1
+                var nextOrder = sortOrder ?: 0
+                if (sortOrder == null) {
+                    db.rawQuery("SELECT MAX(sort_order) FROM sender_tabs", null).use { cursor ->
+                        if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                            nextOrder = cursor.getInt(0) + 1
+                        }
                     }
                 }
                 val cv = ContentValues().apply {

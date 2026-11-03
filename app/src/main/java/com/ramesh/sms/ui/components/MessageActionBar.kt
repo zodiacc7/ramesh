@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,13 +22,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,13 +48,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ramesh.sms.R
@@ -138,10 +137,19 @@ fun MessageActionBar(
         }
         val x = rawX.coerceIn(edge, (availableWidth - barSize.width - edge).coerceAtLeast(edge))
 
+        // Vertical placement, clamped into the window in both directions. A bubble that is only
+        // partly on screen (mid-scroll, or a tall message under the app bar) used to hand the strip
+        // a top edge outside the viewport, which is a layout the container cannot satisfy. Clamping
+        // keeps the strip fully visible: above the bubble when it fits, below it otherwise, and
+        // never past the bottom edge.
+        val maxY = (constraints.maxHeight - barSize.height - edge).coerceAtLeast(edge)
         val above = anchor.top - barSize.height - gap
-        val y = if (barSize.height == 0 || above >= edge) above else anchor.bottom + gap
-        val xDp = with(density) { x.toDp() }
-        val yDp = with(density) { y.toDp() }
+        val below = anchor.bottom + gap
+        val y = when {
+            barSize.height == 0 -> edge
+            above >= edge -> above.coerceAtMost(maxY)
+            else -> below.coerceIn(edge, maxY)
+        }
 
         // Tap anywhere else to close. Drawn first, so the strip itself gets the taps that land on it.
         Box(
@@ -158,17 +166,20 @@ fun MessageActionBar(
             tonalElevation = 6.dp,
             shadowElevation = 8.dp,
             modifier = Modifier
-                .padding(start = xDp, top = yDp)
+                // Positioned with an offset instead of padding: an offset never changes the
+                // constraints handed to the strip, so there is no padding/measure exception to hit
+                // and the strip cannot be squeezed to zero width at the edges of the screen.
+                .offset {
+                    val travel = barSize.width.toFloat().coerceAtLeast(1f)
+                    IntOffset(
+                        x.roundToInt() + (slide.value * travel).roundToInt(),
+                        y.roundToInt()
+                    )
+                }
                 .widthIn(max = 560.dp)
                 // Hidden for the single frame before its size is known, so it never flickers at the
                 // bubble's corner and then jumps above it.
                 .alpha(if (barSize == IntSize.Zero) 0f else 1f)
-                // Travel is the strip's own width, so it emerges from under the bubble instead of
-                // flying across the screen.
-                .offset {
-                    val travel = barSize.width.toFloat().coerceAtLeast(1f)
-                    IntOffset((slide.value * travel).roundToInt(), 0)
-                }
                 .onSizeChanged { barSize = it }
         ) {
             Row(
@@ -208,13 +219,13 @@ fun MessageActionBar(
                         )
                     }
                     BarAction(
-                        // Custom glyph: Material's share icon has no arrowhead, Textra's has.
-                        icon = RameshIcons.Share,
+                        icon = Icons.Default.Share,
                         label = stringResource(R.string.chat_menu_share),
                         onClick = onShare
                     )
                     BarAction(
-                        icon = Icons.AutoMirrored.Filled.Forward,
+                        // Semicircular arrow from the bottom to the left, as in the reference.
+                        icon = RameshIcons.Forward,
                         label = stringResource(R.string.chat_menu_forward),
                         onClick = onForward
                     )
@@ -235,9 +246,9 @@ fun MessageActionBar(
                         onClick = onInfo
                     )
                     BarAction(
-                        // Textra's double check: in its strip this is the "act on this message"
-                        // button, so it enters selection mode with this message selected.
-                        icon = Icons.Default.DoneAll,
+                        // The list-with-double-check mark: it enters selection mode with this
+                        // message selected. The bare double check belongs to "mark as read".
+                        icon = RameshIcons.SelectList,
                         label = stringResource(R.string.chat_menu_select),
                         onClick = onSelect
                     )

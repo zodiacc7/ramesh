@@ -40,4 +40,8 @@
     <string name="chat_select_all">انتخاب همه</string>
     <string name="chat_mark_read">علامت‌گذاری به‌عنوان خوانده‌شده</string>
     <string name="chat_menu_more">بیشتر</string>
+    <string name="chat_forward_search">جستجوی مخاطب یا شماره</string>
+    <string name="chat_forward_no_match">مخاطبی با این جستجو پیدا نشد</string>
+    <string name="chat_delete_again">برای حذف دوباره روی سطل بزنید</string>
+    <string name="chat_undo_deleted">حذف شد — برای بازگرداندن بزنید</string>
 </resources>
