@@ -750,7 +750,6 @@ fun ConversationsScreen(
                         Text(
                             text = if (selectedTab != null) "No conversations in \"${selectedTab.name}\""
                             else "No SMS messages found",
-                            else "No SMS messages found",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
