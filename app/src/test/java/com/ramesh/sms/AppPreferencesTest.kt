@@ -28,6 +28,11 @@ class AppPreferencesTest {
                     val defValue = args[1] as Boolean
                     storage[key] as? Boolean ?: defValue
                 }
+                "getInt" -> {
+                    val key = args!![0] as String
+                    val defValue = args[1] as Int
+                    storage[key] as? Int ?: defValue
+                }
                 "edit" -> createEditorProxy()
                 else -> throw UnsupportedOperationException("Method ${method.name} not implemented in test stub")
             }
@@ -41,6 +46,12 @@ class AppPreferencesTest {
                     "putBoolean" -> {
                         val key = editorArgs!![0] as String
                         val value = editorArgs[1] as Boolean
+                        pendingChanges[key] = value
+                        editorProxy
+                    }
+                    "putInt" -> {
+                        val key = editorArgs!![0] as String
+                        val value = editorArgs[1] as Int
                         pendingChanges[key] = value
                         editorProxy
                     }
