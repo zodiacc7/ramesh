@@ -637,6 +637,7 @@ fun ConversationsScreen(
                                         thread = thread,
                                         selectedIds = NoSelectionIds,
                                         isSelectionMode = false,
+                                        showNewSpam = state.showNewSpam,
                                         simSlotNumber = if (hasMultipleSims && state.showSimBadge) simSlotMap[thread.subId] else null,
                                         useShamsi = state.useShamsiInLists,
                                         appLanguage = state.appLanguage,
@@ -785,6 +786,7 @@ fun ConversationsScreen(
                 ConversationsInboxList(
                     threads = displayedThreads,
                     listState = inboxListState,
+                    showNewSpam = state.showNewSpam,
                     selectedIds = selectedThreadIds,
                     isSelectionMode = isSelectionMode,
                     simSlotMap = simSlotMap,
@@ -1228,6 +1230,7 @@ private fun ConversationsTopBar(
 private fun ConversationsInboxList(
     threads: List<ConversationThread>,
     listState: LazyListState = rememberLazyListState(),
+    showNewSpam: Boolean = true,
     selectedIds: Set<Long>,
     isSelectionMode: Boolean,
     simSlotMap: Map<Int, Int> = emptyMap(),
@@ -1264,6 +1267,7 @@ private fun ConversationsInboxList(
                     selectedIds = selectedIds,
                     isSelectionMode = isSelectionMode,
                     showAvatar = showAvatars,
+                    showNewSpam = showNewSpam,
                     simSlotNumber = if (hasMultipleSims && showSimBadge) simSlotMap[thread.subId] else null,
                     useShamsi = useShamsi,
                     appLanguage = appLanguage,
@@ -1316,6 +1320,8 @@ private fun ConversationItem(
     simSlotNumber: Int? = null,
     useShamsi: Boolean = false,
     appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    /** Whether unopened spam is marked new (Settings switch). */
+    showNewSpam: Boolean = true,
     onAvatarClick: (() -> Unit)? = null
 ) {
     val isSelected by remember(thread.threadId) {
@@ -1485,7 +1491,7 @@ private fun ConversationItem(
                 // unread, so the number in the badge can be traced to rows here.
                 if (showsSpam && !isSelectionMode) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    SpamChip(newCount = if (state.showNewSpam) thread.newSpamCount else 0)
+                    SpamChip(newCount = if (showNewSpam) thread.newSpamCount else 0)
                 }
 
                 if (thread.unreadCount > 0 && !isSelectionMode && !thread.isUnreadSpam) {
