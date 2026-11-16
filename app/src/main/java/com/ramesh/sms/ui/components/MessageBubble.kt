@@ -192,6 +192,7 @@ fun MessageBubble(
                 BubbleContent(
                     message = message,
                     contentColor = contentColor,
+                    bubbleColor = surfaceColor,
                     dateText = dateText,
                     timeText = timeText,
                     isSent = isSent,
@@ -229,6 +230,7 @@ fun MessageBubble(
                 BubbleContent(
                     message = message,
                     contentColor = contentColor,
+                    bubbleColor = surfaceColor,
                     dateText = dateText,
                     timeText = timeText,
                     isSent = isSent,
@@ -251,6 +253,8 @@ fun MessageBubble(
 private fun BubbleContent(
     message: SmsMessage,
     contentColor: Color,
+    /** The bubble's own background, so the text selection can contrast with it. */
+    bubbleColor: Color,
     dateText: String,
     timeText: String,
     isSent: Boolean,
@@ -290,8 +294,8 @@ private fun BubbleContent(
                 // the veil and the handles are therefore derived from the bubble's brightness, not
                 // from the theme's primary, so no bubble can hide its own selection.
                 val selectionColors = TextSelectionColors(
-                    handleColor = selectionHandleColor(containerColor),
-                    backgroundColor = selectionHighlight(containerColor)
+                    handleColor = selectionHandleColor(bubbleColor),
+                    backgroundColor = selectionHighlight(bubbleColor)
                 )
                 CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
                     BasicTextField(
