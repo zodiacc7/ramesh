@@ -83,7 +83,7 @@
     <string name="settings_storage_header">Storage</string>
     <string name="settings_storage_sub">Keep conversations from growing forever</string>
     <string name="settings_auto_delete">Auto-delete old messages</string>
-    <string name="settings_auto_delete_sub">Per conversation. Older messages are removed from the phone once the limit is passed; off by default.</string>
+    <string name="settings_auto_delete_sub">Per conversation. Once it is on, older messages are removed from the phone as soon as a conversation passes the limit below. Off by default.</string>
     <string name="settings_reset_header">Reset</string>
     <string name="settings_restore_look">Restore default look</string>
     <string name="settings_restore_look_sub">Turquoise theme, classic bubbles, no wallpaper</string>
@@ -96,6 +96,7 @@
     <string name="settings_swipe_delete_sub">Swipe a conversation left or right to show a delete button for five seconds</string>
     <string name="settings_seconds_value">%1$d s</string>
     <string name="settings_messages_count">%1$s messages</string>
+    <string name="settings_auto_delete_limit">Keep at most</string>
     <string name="settings_message_animation">Message animation</string>
     <string name="settings_message_animation_sub">How a conversation opens and closes</string>
     <string name="settings_animation_preview_page">Conversation</string>
@@ -120,7 +121,7 @@
     <string name="settings_new_spam">Show new spam</string>
     <string name="settings_new_spam_sub">Mark filtered spam that arrived and has not been opened yet, in the inbox and inside the conversation</string>
     <string name="settings_spam_auto_delete">Auto-delete spam</string>
-    <string name="settings_spam_auto_delete_sub">Remove filtered spam automatically after the number of days below. Off by default.</string>
+    <string name="settings_spam_auto_delete_sub">Remove filtered spam automatically once it is older than the number of days below. Off by default.</string>
     <string name="settings_spam_auto_delete_days">Delete spam older than</string>
     <string name="settings_days_count">%1$d days</string>
     <string name="settings_crash_log">Share the last crash log</string>

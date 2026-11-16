@@ -1,0 +1,18 @@
+Ramesh 1.1.0.09 (build 1010009) — pre-release.
+
+Icons are now traced from your three samples, not redrawn by eye: the forward arrow, the bracket-with-a-check "select", and the three-node share glyph are the samples' own outlines on the 24x24 grid. Rasterised back and compared outline to outline, they overlap the samples by 97-99%. Share is the biggest visible change: Material's nodes are noticeably smaller than yours, which is why it never matched even after the arrowhead was removed.
+
+Copy:
+- Tapping Copy no longer copies anything by itself. It selects the whole message and shows a small row under the bubble with Copy, Select all and a close button; nothing reaches the clipboard until you tap Copy there. Tapping anywhere else on the screen leaves the mode without copying.
+- Copying from that row copies the part you actually selected, not always the whole message.
+
+Send delay:
+- A message that goes into the delay is always on screen: the conversation scrolls to the pending bubble, so Cancel is one tap away instead of a scroll away.
+
+Settings:
+- "Auto-delete old messages" now has an on/off switch first and the limit slider underneath, like auto-delete spam. Turning it on starts at 500 messages per conversation.
+- The auto-delete spam slider is no longer linear from 1 to 90. It snaps to 1, 2, 3, … 10, then 20, 30, … 90, so the days people actually use are big targets instead of being squeezed into the far left of the track.
+
+Dates are untouched in this build.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.

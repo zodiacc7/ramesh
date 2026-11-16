@@ -37,8 +37,8 @@ android {
         applicationId = "com.ramesh.sms"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1010008
-        versionName = "1.1.0.08"
+        versionCode = 1010009
+        versionName = "1.1.0.09"
     }
 
     signingConfigs {
