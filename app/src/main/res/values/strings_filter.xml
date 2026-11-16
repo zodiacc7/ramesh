@@ -65,4 +65,12 @@
     <string name="filter_exported">Exported %1$d rules with listType to the clipboard</string>
     <string name="filter_export_label">Ramesh rules</string>
     <string name="filter_presets_blocklist">Spam &amp; Blocklist presets</string>
+    <string name="filter_tab_decisions">Decisions (%1$d)</string>
+    <string name="filter_decisions_search">Search a number or name</string>
+    <string name="filter_decisions_empty">No spam, silent or blocked numbers</string>
+    <string name="filter_decisions_empty_sub">Numbers you mark as spam, silent or blocked from a conversation appear here, and can be put back to normal.</string>
+    <string name="filter_decision_spam">Spam</string>
+    <string name="filter_decision_silent">Silent</string>
+    <string name="filter_decision_blocked">Blocked</string>
+    <string name="filter_decision_restore">Restore</string>
 </resources>

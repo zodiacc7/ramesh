@@ -65,4 +65,12 @@
     <string name="filter_exported">%1$d قاعده همراه با listType در کلیپ‌بورد کپی شد</string>
     <string name="filter_export_label">قواعد رامش</string>
     <string name="filter_presets_blocklist">پیش‌تنظیم‌های اسپم و فهرست مسدود</string>
+    <string name="filter_tab_decisions">تصمیم‌ها (%1$d)</string>
+    <string name="filter_decisions_search">جستجوی شماره یا نام</string>
+    <string name="filter_decisions_empty">شمارهٔ اسپم، سایلنت یا مسدودی نیست</string>
+    <string name="filter_decisions_empty_sub">شماره‌هایی که از داخل گفتگو اسپم، سایلنت یا مسدود کرده‌اید اینجا دیده می‌شوند و می‌توانید به حالت عادی برگردانید.</string>
+    <string name="filter_decision_spam">اسپم</string>
+    <string name="filter_decision_silent">سایلنت</string>
+    <string name="filter_decision_blocked">مسدود</string>
+    <string name="filter_decision_restore">بازگرداندن</string>
 </resources>

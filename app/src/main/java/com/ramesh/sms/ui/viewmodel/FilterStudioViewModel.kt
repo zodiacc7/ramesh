@@ -8,6 +8,7 @@ import com.ramesh.sms.data.model.FilterAction
 import com.ramesh.sms.data.model.FilterRule
 import com.ramesh.sms.data.model.RuleCategory
 import com.ramesh.sms.data.model.RuleListType
+import com.ramesh.sms.data.model.SenderPreference
 import com.ramesh.sms.engine.RegexTestResult
 import com.ramesh.sms.engine.SmsFilterEngine
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,28 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+/**
+ * A sender the user has decided about one by one, from the participant sheet: spam, silent or
+ * blocked. They were invisible until now - no screen listed them, so a number silenced by mistake
+ * could only be found by remembering which conversation it was.
+ */
+data class DecidedSender(
+    val address: String,
+    val displayName: String?,
+    val action: FilterAction,
+    val isBlocked: Boolean,
+    val updatedAt: Long
+) {
+    /** What the row should say, in one word. */
+    val label: String
+        get() = when {
+            isBlocked -> "Blocked"
+            action == FilterAction.SPAM -> "Spam"
+            action == FilterAction.SILENT -> "Silent"
+            else -> "Normal"
+        }
+}
+
 data class FilterStudioUiState(
     val rules: List<FilterRule> = emptyList(),
     val allowlistRules: List<FilterRule> = emptyList(),
@@ -33,7 +56,9 @@ data class FilterStudioUiState(
     val testResult: RegexTestResult? = null,
     val simulatedAction: FilterAction = FilterAction.SPAM,
     val simulatedListType: RuleListType = RuleListType.BLOCKLIST,
-    val toastMessage: String? = null
+    val toastMessage: String? = null,
+    /** Senders with a per-sender spam/silent/block decision, for the review tab. */
+    val decidedSenders: List<DecidedSender> = emptyList()
 )
 
 class FilterStudioViewModel(application: Application) : AndroidViewModel(application) {
@@ -56,12 +81,45 @@ class FilterStudioViewModel(application: Application) : AndroidViewModel(applica
             val allowlist = all.filter { it.listType == RuleListType.ALLOWLIST }
             val blocklist = all.filter { it.listType == RuleListType.BLOCKLIST }
             val predefined = all.filter { it.isPredefined }
+            val decided = dbHelper.getAllSenderPreferences().values
+                .filter { pref ->
+                    pref.isBlocked ||
+                        pref.defaultAction == FilterAction.SPAM ||
+                        pref.defaultAction == FilterAction.SILENT
+                }
+                .map { pref ->
+                    DecidedSender(
+                        address = pref.address,
+                        displayName = pref.displayName,
+                        action = pref.defaultAction,
+                        isBlocked = pref.isBlocked,
+                        updatedAt = pref.updatedAt
+                    )
+                }
+                .sortedByDescending { it.updatedAt }
             _uiState.value = _uiState.value.copy(
                 rules = all,
                 allowlistRules = allowlist,
                 blocklistRules = blocklist,
-                predefinedRules = predefined
+                predefinedRules = predefined,
+                decidedSenders = decided
             )
+        }
+    }
+
+    /** Puts a sender back to normal: no spam tier, not blocked, verdict re-evaluated. */
+    fun restoreSender(address: String) {
+        viewModelScope.launch {
+            val existing = dbHelper.getSenderPreference(address)
+            dbHelper.saveSenderPreference(
+                (existing ?: SenderPreference(address = address)).copy(
+                    defaultAction = FilterAction.NORMAL,
+                    isBlocked = false,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            _uiState.value = _uiState.value.copy(toastMessage = "Restored $address to normal")
+            loadRules()
         }
     }
 

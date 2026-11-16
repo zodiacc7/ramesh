@@ -104,6 +104,23 @@ class AppPreferencesTest {
     }
 
     @Test
+    fun spamAutoDeleteIsOffByDefaultAndClamps() {
+        val fakePrefs = InMemorySharedPreferences()
+        val appPreferences = AppPreferences(fakePrefs.proxy)
+
+        assertEquals(0, appPreferences.spamAutoDeleteDays)
+
+        appPreferences.spamAutoDeleteDays = 30
+        assertEquals(30, fakePrefs.storage[AppPreferences.KEY_SPAM_AUTO_DELETE_DAYS])
+
+        appPreferences.spamAutoDeleteDays = -5
+        assertEquals(0, appPreferences.spamAutoDeleteDays)
+
+        appPreferences.spamAutoDeleteDays = 10_000
+        assertEquals(365, appPreferences.spamAutoDeleteDays)
+    }
+
+    @Test
     fun defaultAllTabIndexLeavesRoomForContactsAndOther() {
         val fakePrefs = InMemorySharedPreferences()
         val appPreferences = AppPreferences(fakePrefs.proxy)

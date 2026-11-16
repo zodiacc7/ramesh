@@ -24,10 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -219,18 +215,21 @@ fun MessageActionBar(
                         )
                     }
                     BarAction(
-                        icon = Icons.Default.Share,
+                        // The reference glyph, which carries an arrowhead on the upper node.
+                        icon = RameshIcons.Share,
                         label = stringResource(R.string.chat_menu_share),
                         onClick = onShare
                     )
                     BarAction(
-                        // Semicircular arrow from the bottom to the left, as in the reference.
+                        // Filled arrow sweeping up from the bottom left, as in the reference.
                         icon = RameshIcons.Forward,
                         label = stringResource(R.string.chat_menu_forward),
                         onClick = onForward
                     )
                     BarAction(
-                        icon = if (deleteArmed) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                        // A filled can with a separate lid, like the reference - not Material's
+                        // outline bin. Arming it only changes the colour.
+                        icon = RameshIcons.Trash,
                         label = if (deleteArmed) {
                             stringResource(R.string.chat_delete_confirm)
                         } else {
@@ -241,13 +240,13 @@ fun MessageActionBar(
                         onClick = onDelete
                     )
                     BarAction(
-                        icon = Icons.Default.Info,
+                        icon = RameshIcons.InfoFilled,
                         label = stringResource(R.string.chat_message_info),
                         onClick = onInfo
                     )
                     BarAction(
-                        // The list-with-double-check mark: it enters selection mode with this
-                        // message selected. The bare double check belongs to "mark as read".
+                        // Check plus rules: it enters selection mode with this message selected.
+                        // The bare double check belongs to "mark as read".
                         icon = RameshIcons.SelectList,
                         label = stringResource(R.string.chat_menu_select),
                         onClick = onSelect

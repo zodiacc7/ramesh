@@ -119,4 +119,10 @@
     <string name="settings_about_close">Close</string>
     <string name="settings_new_spam">Show new spam</string>
     <string name="settings_new_spam_sub">Mark filtered spam that arrived and has not been opened yet, in the inbox and inside the conversation</string>
+    <string name="settings_spam_auto_delete">Auto-delete spam</string>
+    <string name="settings_spam_auto_delete_sub">Remove filtered spam automatically after the number of days below. Off by default.</string>
+    <string name="settings_spam_auto_delete_days">Delete spam older than</string>
+    <string name="settings_days_count">%1$d days</string>
+    <string name="settings_crash_log">Share the last crash log</string>
+    <string name="settings_crash_log_sub">The app closed unexpectedly last time. Tap to send the report.</string>
 </resources>

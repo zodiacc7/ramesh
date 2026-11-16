@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.CheckCircle
@@ -116,6 +117,7 @@ import com.ramesh.sms.ui.components.hasPersistedReadAccess
 import com.ramesh.sms.ui.components.persistWallpaperAccess
 import com.ramesh.sms.ui.components.progressForAutoDeleteLimit
 import com.ramesh.sms.ui.viewmodel.ConversationsViewModel
+import com.ramesh.sms.util.CrashLog
 import kotlin.math.roundToInt
 
 private val ToneDotColors: List<Pair<String, androidx.compose.ui.graphics.Color?>> =
@@ -153,6 +155,13 @@ fun SettingsScreen(
     var autoDeleteProgress by remember(inboxState.autoDeleteLimit) {
         mutableFloatStateOf(progressForAutoDeleteLimit(inboxState.autoDeleteLimit))
     }
+    // 0 = off, 1..365 = days. The slider only becomes visible once the switch is on.
+    var spamAutoDeleteDays by remember(inboxState.spamAutoDeleteDays) {
+        mutableIntStateOf(inboxState.spamAutoDeleteDays)
+    }
+
+    // Read once: the file is small, and reading it on every recomposition of a long list is waste.
+    var crashLog by remember { mutableStateOf(CrashLog.read(context)) }
 
     val appVersion = remember(context) {
         runCatching {
@@ -708,6 +717,34 @@ fun SettingsScreen(
                             )
                         }
                     )
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.settings_spam_auto_delete),
+                        subtitle = stringResource(R.string.settings_spam_auto_delete_sub),
+                        checked = spamAutoDeleteDays > 0,
+                        onCheckedChange = { enabled ->
+                            val next = if (enabled) DEFAULT_SPAM_AUTO_DELETE_DAYS else 0
+                            spamAutoDeleteDays = next
+                            inboxViewModel.setSpamAutoDeleteDays(next)
+                        },
+                        showDivider = spamAutoDeleteDays > 0
+                    )
+                    if (spamAutoDeleteDays > 0) {
+                        SettingsSliderRow(
+                            title = stringResource(R.string.settings_spam_auto_delete_days),
+                            value = spamAutoDeleteDays.toFloat(),
+                            valueRange = 1f..90f,
+                            steps = 88,
+                            valueLabel = stringResource(
+                                R.string.settings_days_count,
+                                spamAutoDeleteDays
+                            ),
+                            onValueChange = { spamAutoDeleteDays = it.toInt().coerceAtLeast(1) },
+                            onValueChangeFinished = {
+                                inboxViewModel.setSpamAutoDeleteDays(spamAutoDeleteDays)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -723,8 +760,35 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_about_app),
                         subtitle = stringResource(R.string.settings_about_version, appVersion),
                         icon = Icons.Default.Info,
-                        onClick = { showAboutDialog = true }
+                        onClick = { showAboutDialog = true },
+                        showDivider = crashLog != null
                     )
+                    // Only when the last run actually crashed: one tap shares the stack trace, which
+                    // is the only way to see why a release build closed by itself.
+                    if (crashLog != null) {
+                        SettingsActionRow(
+                            title = stringResource(R.string.settings_crash_log),
+                            subtitle = stringResource(R.string.settings_crash_log_sub),
+                            icon = Icons.Default.BugReport,
+                            onClick = {
+                                val share = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "Ramesh crash log")
+                                    putExtra(Intent.EXTRA_TEXT, crashLog)
+                                }
+                                runCatching {
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            share,
+                                            context.getString(R.string.settings_crash_log)
+                                        )
+                                    )
+                                }
+                                CrashLog.clear(context)
+                                crashLog = null
+                            }
+                        )
+                    }
                 }
             }
 
@@ -995,6 +1059,9 @@ private fun BubblePreviewCard(look: Appearance) {
         }
     }
 }
+
+/** Days the spam auto-delete starts at when the switch is turned on. Never zero. */
+private const val DEFAULT_SPAM_AUTO_DELETE_DAYS = 30
 
 /** Replays the screen transition inside the conversation preview card when it is tapped. */
 @Composable

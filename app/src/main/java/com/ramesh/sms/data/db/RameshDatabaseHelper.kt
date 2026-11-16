@@ -823,6 +823,25 @@ class RameshDatabaseHelper private constructor(context: Context) :
         if (updated > 0) _spamMetaChanged.value = System.currentTimeMillis()
     }
 
+    /**
+     * Marks every not-yet-opened spam message as seen.
+     *
+     * "Mark all as read" only used to clear `Telephony.Sms.READ`, but a spam arrival is stored read
+     * from the start: what the badges count for spam is `spam_message_meta.is_new`. Without this the
+     * inbox could be fully read and the tab badge would still show the spam it had counted.
+     */
+    suspend fun markAllNewSpamSeen(): Int = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply { put("is_new", 0) }
+        val updated = try {
+            writableDatabase.update("spam_message_meta", values, "is_new = 1", null)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not clear every new-spam flag", e)
+            0
+        }
+        if (updated > 0) _spamMetaChanged.value = System.currentTimeMillis()
+        updated
+    }
+
     suspend fun getCachedThreadAddresses(threadIds: Collection<Long>): Map<Long, String> =
         withContext(Dispatchers.IO) {
             if (threadIds.isEmpty()) return@withContext emptyMap()

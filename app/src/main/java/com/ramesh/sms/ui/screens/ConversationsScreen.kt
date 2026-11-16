@@ -97,6 +97,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -208,9 +209,22 @@ fun ConversationsScreen(
             }
         }
         val filter = IntentFilter(SmsReceiver.ACTION_NEW_SMS_RECEIVED)
-        ContextCompat.registerReceiver(appContext, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        // Both calls are guarded: an unregister that fails (the process tearing down while the
+        // effect is being disposed, or a receiver that never registered) used to throw out of
+        // onDispose, which is a crash with no screen attached to it - exactly the kind that shows up
+        // only when leaving the app.
+        val registered = runCatching {
+            ContextCompat.registerReceiver(
+                appContext,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        }.isSuccess
         onDispose {
-            appContext.unregisterReceiver(receiver)
+            if (registered) {
+                runCatching { appContext.unregisterReceiver(receiver) }
+            }
         }
     }
 
@@ -273,11 +287,25 @@ fun ConversationsScreen(
         isSearchOpen = false
     }
 
-    // Entering a tab always starts at its first conversation: the previous tab's scroll offset
-    // would otherwise drop the user into the middle of a list they have never seen.
-    val inboxListState = rememberLazyListState()
+    // The list remembers where it was per tab, so closing a chat lands back on the conversation
+    // that was opened; it only jumps to the first row when the tab itself changed.
+    val initialScrollIndex = remember(viewModel, state.selectedTabId) {
+        viewModel.inboxScrollIndex(state.selectedTabId)
+    }
+    val inboxListState = remember(initialScrollIndex) {
+        LazyListState(firstVisibleItemIndex = initialScrollIndex)
+    }
+    val currentTabId = rememberUpdatedState(state.selectedTabId)
+    DisposableEffect(inboxListState) {
+        onDispose {
+            viewModel.rememberInboxScrollIndex(currentTabId.value, inboxListState.firstVisibleItemIndex)
+        }
+    }
     LaunchedEffect(state.selectedTabId) {
-        runCatching { inboxListState.scrollToItem(0) }
+        if (viewModel.consumeScrollToTop()) {
+            runCatching { inboxListState.scrollToItem(0) }
+            viewModel.rememberInboxScrollIndex(state.selectedTabId, 0)
+        }
     }
     val currentlyVisibleThreads = remember(state.filteredThreads, state.pendingDeleteIds) {
         state.filteredThreads.filter { it.threadId !in state.pendingDeleteIds }

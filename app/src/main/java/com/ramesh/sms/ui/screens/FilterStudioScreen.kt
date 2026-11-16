@@ -32,10 +32,13 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.VolumeMute
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -47,13 +50,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import com.ramesh.sms.ui.util.contentAware
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -66,7 +69,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,9 +78,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ramesh.sms.R
 import com.ramesh.sms.data.model.FilterAction
 import com.ramesh.sms.data.model.FilterRule
 import com.ramesh.sms.data.model.RuleListType
@@ -87,11 +93,12 @@ import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.SquircleCardShape
 import com.ramesh.sms.theme.SquircleMediumShape
 import com.ramesh.sms.theme.TagShape
-import com.ramesh.sms.R
+import com.ramesh.sms.ui.util.contentAware
+import com.ramesh.sms.ui.viewmodel.DecidedSender
 import com.ramesh.sms.ui.viewmodel.FilterStudioUiState
 import com.ramesh.sms.ui.viewmodel.FilterStudioViewModel
 
-private enum class FilterStudioTab { Playground, Allowlist, Blocklist, Presets }
+private enum class FilterStudioTab { Playground, Allowlist, Blocklist, Presets, Decisions }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,6 +286,22 @@ fun FilterStudioScreen(
                         )
                     }
                 )
+                // The one place that lists senders decided about one by one, from the participant
+                // sheet. Without it a number silenced by mistake had no address anywhere in the app.
+                Tab(
+                    selected = selectedTab == FilterStudioTab.Decisions,
+                    onClick = { selectedTab = FilterStudioTab.Decisions },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.VolumeMute, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                stringResource(R.string.filter_tab_decisions, state.decidedSenders.size),
+                                fontWeight = if (selectedTab == FilterStudioTab.Decisions) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                )
             }
 
             when (selectedTab) {
@@ -308,6 +331,10 @@ fun FilterStudioScreen(
                     onToggle = viewModel::toggleRule,
                     onEdit = { editingRule = it },
                     onDelete = { ruleToDelete = it }
+                )
+                FilterStudioTab.Decisions -> DecisionsTab(
+                    senders = state.decidedSenders,
+                    onRestore = viewModel::restoreSender
                 )
             }
         }
@@ -1539,3 +1566,134 @@ fun AddGlobalRuleDialog(
     )
 }
 
+/**
+ * Senders the user silenced, marked as spam or blocked one by one.
+ *
+ * Each row can be put back to normal, which is the whole point: a number blocked from a conversation
+ * used to be a decision with no undo and no list to find it in.
+ */
+@Composable
+private fun DecisionsTab(
+    senders: List<DecidedSender>,
+    onRestore: (String) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query, senders) {
+        val needle = query.trim()
+        if (needle.isBlank()) {
+            senders
+        } else {
+            senders.filter { sender ->
+                sender.address.contains(needle, ignoreCase = true) ||
+                    sender.displayName?.contains(needle, ignoreCase = true) == true
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            placeholder = { Text(stringResource(R.string.filter_decisions_search)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        if (filtered.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.VolumeOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.filter_decisions_empty),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.filter_decisions_empty_sub),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 24.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(items = filtered, key = { it.address }) { sender ->
+                    val chipColor = when {
+                        sender.isBlocked -> MaterialTheme.colorScheme.errorContainer
+                        sender.action == FilterAction.SPAM -> MaterialTheme.colorScheme.errorContainer
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    }
+                    val chipContent = when {
+                        sender.isBlocked || sender.action == FilterAction.SPAM ->
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else -> MaterialTheme.colorScheme.onSecondaryContainer
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = sender.displayName?.takeIf { it.isNotBlank() }
+                                    ?: sender.address,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = sender.address,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Surface(shape = PillShape, color = chipColor) {
+                            Text(
+                                text = stringResource(
+                                    when {
+                                        sender.isBlocked -> R.string.filter_decision_blocked
+                                        sender.action == FilterAction.SPAM -> R.string.filter_decision_spam
+                                        else -> R.string.filter_decision_silent
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = chipContent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        TextButton(onClick = { onRestore(sender.address) }) {
+                            Text(
+                                text = stringResource(R.string.filter_decision_restore),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
+    }
+}

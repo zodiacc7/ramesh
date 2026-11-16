@@ -840,6 +840,9 @@ class SmsRepository(
         }
     }
 
+    /** Clears every "new spam" mark, so "mark all as read" really empties the spam badges too. */
+    suspend fun markAllNewSpamSeen(): Int = dbHelper.markAllNewSpamSeen()
+
     suspend fun markAllMessagesRead() = withContext(Dispatchers.IO) {
         try {
             context.contentResolver.update(
@@ -944,6 +947,72 @@ class SmsRepository(
             false
         }
     }
+
+    private var lastSpamPurgeAt = 0L
+
+    /**
+     * Deletes spam messages older than [days] days, and only spam.
+     *
+     * "Old" is the message's own timestamp inside the SMS provider, not when Ramesh saw it, so a
+     * restored backup is judged by the same rule. Unread/undiscovered spam is deleted as well - that
+     * is the point of the setting: filtered messages nobody asked for should not pile up forever.
+     * Runs at most once every few hours, because it is called from the inbox load path.
+     */
+    suspend fun purgeOldSpam(days: Int, minIntervalMillis: Long = 6 * 60 * 60 * 1000L): Int =
+        withContext(Dispatchers.IO) {
+            if (days <= 0) return@withContext 0
+            val now = System.currentTimeMillis()
+            if (lastSpamPurgeAt != 0L && now - lastSpamPurgeAt < minIntervalMillis) return@withContext 0
+            lastSpamPurgeAt = now
+            val cutoff = now - days * 24L * 60L * 60L * 1000L
+            val spamIds = try {
+                dbHelper.getAllSpamMetaMap().filterValues { it.isSpam }.keys
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read the spam index", e)
+                return@withContext 0
+            }
+            if (spamIds.isEmpty()) return@withContext 0
+
+            val expired = mutableListOf<Long>()
+            try {
+                for (chunk in spamIds.toList().chunked(SQLITE_IN_CHUNK_SIZE)) {
+                    val placeholders = chunk.joinToString(",") { "?" }
+                    context.contentResolver.query(
+                        Telephony.Sms.CONTENT_URI,
+                        arrayOf(Telephony.Sms._ID, Telephony.Sms.DATE),
+                        "${Telephony.Sms._ID} IN ($placeholders)",
+                        chunk.map { it.toString() }.toTypedArray(),
+                        null
+                    )?.use { cursor ->
+                        val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+                        val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
+                        while (cursor.moveToNext()) {
+                            if (cursor.getLong(dateIndex) < cutoff) expired.add(cursor.getLong(idIndex))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read spam dates", e)
+                return@withContext 0
+            }
+            if (expired.isEmpty()) return@withContext 0
+
+            var deleted = 0
+            for (chunk in expired.chunked(SQLITE_IN_CHUNK_SIZE)) {
+                val placeholders = chunk.joinToString(",") { "?" }
+                try {
+                    deleted += context.contentResolver.delete(
+                        Telephony.Sms.CONTENT_URI,
+                        "${Telephony.Sms._ID} IN ($placeholders)",
+                        chunk.map { it.toString() }.toTypedArray()
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Could not delete expired spam", e)
+                }
+            }
+            if (deleted > 0) dbHelper.deleteSpamMetaForMessageIds(expired)
+            deleted
+        }
 
     /** Attaches (or clears, when [emoji] is null) a local emoji reaction to a message. */
     suspend fun setReaction(messageId: Long, emoji: String?) = withContext(Dispatchers.IO) {

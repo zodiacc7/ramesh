@@ -28,6 +28,9 @@ interface UserPreferences {
     /** Keep at most this many messages per conversation (0 = unlimited). */
     var autoDeleteLimit: Int
 
+    /** Delete spam this many days after it arrived (0 = never, the default). */
+    var spamAutoDeleteDays: Int
+
     /** How much of a message may appear on the lock screen. */
     var lockScreenPrivacy: LockScreenPrivacy
 
@@ -124,6 +127,12 @@ class AppPreferences(
             prefs.edit().putInt(KEY_AUTO_DELETE_LIMIT, value.coerceAtLeast(0)).apply()
         }
 
+    override var spamAutoDeleteDays: Int
+        get() = prefs.getInt(KEY_SPAM_AUTO_DELETE_DAYS, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_SPAM_AUTO_DELETE_DAYS, value.coerceIn(0, 365)).apply()
+        }
+
     override var lockScreenPrivacy: LockScreenPrivacy
         get() = LockScreenPrivacy.fromName(prefs.getString(KEY_LOCK_SCREEN_PRIVACY, null))
         set(value) {
@@ -162,6 +171,7 @@ class AppPreferences(
         const val KEY_DELIVERY_REPORTS = "delivery_reports"
         const val KEY_SEND_DELAY_SECONDS = "send_delay_seconds"
         const val KEY_AUTO_DELETE_LIMIT = "auto_delete_limit"
+        const val KEY_SPAM_AUTO_DELETE_DAYS = "spam_auto_delete_days"
         const val KEY_LOCK_SCREEN_PRIVACY = "lock_screen_privacy"
         const val KEY_APP_LANGUAGE = "app_language"
         const val KEY_SHOW_SIM_BADGE = "show_sim_badge"
