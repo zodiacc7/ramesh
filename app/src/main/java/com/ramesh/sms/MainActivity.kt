@@ -26,6 +26,7 @@ import com.ramesh.sms.engine.NotificationHelper
 import com.ramesh.sms.theme.AppearanceStore
 import com.ramesh.sms.theme.RameshTheme
 import com.ramesh.sms.ui.util.localizedContext
+import com.ramesh.sms.util.CrashLog
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -49,6 +50,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Look & feel is stored separately from the inbox preferences.
         AppearanceStore.init(this)
+        // "It sometimes crashes when I leave the app" cannot be fixed from a guess: record the next
+        // one so it can be read (and shared) from Settings.
+        CrashLog.install(this)
         enableEdgeToEdge()
         handleIntent(intent)
 

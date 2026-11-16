@@ -119,4 +119,10 @@
     <string name="settings_about_close">بستن</string>
     <string name="settings_new_spam">نمایش اسپم‌های جدید</string>
     <string name="settings_new_spam_sub">اسپم فیلترشده‌ای که تازه رسیده و باز نشده، هم در صندوق ورودی و هم داخل گفتگو علامت‌گذاری شود</string>
+    <string name="settings_spam_auto_delete">حذف خودکار اسپم‌ها</string>
+    <string name="settings_spam_auto_delete_sub">اسپم‌های فیلترشده بعد از تعداد روزِ زیر خودکار پاک می‌شوند. پیش‌فرض خاموش است.</string>
+    <string name="settings_spam_auto_delete_days">حذف اسپم‌های قدیمی‌تر از</string>
+    <string name="settings_days_count">%1$d روز</string>
+    <string name="settings_crash_log">ارسال گزارش آخرین کرش</string>
+    <string name="settings_crash_log_sub">دفعهٔ قبل برنامه غیرمنتظره بسته شد. برای ارسال گزارش بزنید.</string>
 </resources>

@@ -44,4 +44,6 @@
     <string name="chat_forward_no_match">No contact matches this search</string>
     <string name="chat_delete_again">Tap the bin again to delete</string>
     <string name="chat_undo_deleted">Deleted — tap to undo</string>
+    <string name="chat_send_pending">Sending in %1$d s</string>
+    <string name="chat_send_cancel">Cancel</string>
 </resources>

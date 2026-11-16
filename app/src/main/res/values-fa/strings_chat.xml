@@ -44,4 +44,6 @@
     <string name="chat_forward_no_match">مخاطبی با این جستجو پیدا نشد</string>
     <string name="chat_delete_again">برای حذف دوباره روی سطل بزنید</string>
     <string name="chat_undo_deleted">حذف شد — برای بازگرداندن بزنید</string>
+    <string name="chat_send_pending">ارسال تا %1$d ثانیه</string>
+    <string name="chat_send_cancel">لغو</string>
 </resources>

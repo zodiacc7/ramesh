@@ -1,10 +1,10 @@
 package com.ramesh.sms.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,14 +13,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
@@ -30,36 +31,37 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ramesh.sms.data.model.SmsMessage
+import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.theme.AppearanceStore
 import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.bubbleBackground
+import com.ramesh.sms.theme.bubbleContent
 import com.ramesh.sms.theme.bubbleContentBottomPadding
 import com.ramesh.sms.theme.chatBubbleShape
-import com.ramesh.sms.theme.bubbleContent
-import com.ramesh.sms.data.util.AppLanguage
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
 import com.ramesh.sms.ui.util.forMessageBody
@@ -261,14 +263,25 @@ private fun BubbleContent(
                 var selection by remember(message.id, inlineSelectKey) {
                     mutableStateOf(TextFieldValue(message.body, TextRange(0, message.body.length)))
                 }
-                BasicTextField(
-                    value = selection,
-                    onValueChange = { next -> selection = next.copy(text = message.body) },
-                    readOnly = true,
-                    textStyle = bodyStyle.merge(TextStyle(color = contentColor)),
-                    cursorBrush = SolidColor(Color.Transparent),
-                    modifier = Modifier.fillMaxWidth()
+                // The selection has to be visible *on the bubble*, and the bubble is drawn in the
+                // user's own tone - often the same accent colour the default selection uses. The
+                // highlight is therefore derived from the bubble's content colour (white on a dark
+                // bubble, dark on a light one) and kept at a low alpha, so it always contrasts with
+                // whatever the bubble is painted with.
+                val selectionColors = TextSelectionColors(
+                    handleColor = contentColor,
+                    backgroundColor = contentColor.copy(alpha = 0.38f)
                 )
+                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                    BasicTextField(
+                        value = selection,
+                        onValueChange = { next -> selection = next.copy(text = message.body) },
+                        readOnly = true,
+                        textStyle = bodyStyle.merge(TextStyle(color = contentColor)),
+                        cursorBrush = SolidColor(Color.Transparent),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             } else {
                 Text(
                     text = message.body,

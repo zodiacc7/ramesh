@@ -10,6 +10,7 @@ import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.setValue
@@ -62,6 +63,8 @@ data class ConversationsUiState(
     val deliveryReports: Boolean = false,
     val sendDelaySeconds: Int = 0,
     val autoDeleteLimit: Int = 0,
+    /** Delete spam this many days after it arrived; 0 = never. */
+    val spamAutoDeleteDays: Int = 0,
     val lockScreenPrivacy: LockScreenPrivacy = LockScreenPrivacy.FULL,
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** Show a SIM slot badge next to each conversation (only meaningful with 2+ SIMs). */
@@ -125,6 +128,7 @@ class ConversationsViewModel(
             deliveryReports = userPreferences.deliveryReports,
             sendDelaySeconds = userPreferences.sendDelaySeconds,
             autoDeleteLimit = userPreferences.autoDeleteLimit,
+            spamAutoDeleteDays = userPreferences.spamAutoDeleteDays,
             lockScreenPrivacy = userPreferences.lockScreenPrivacy,
             appLanguage = userPreferences.appLanguage,
             allTabIndex = userPreferences.allTabIndex,
@@ -258,6 +262,7 @@ class ConversationsViewModel(
             deliveryReports = userPreferences.deliveryReports,
             sendDelaySeconds = userPreferences.sendDelaySeconds,
             autoDeleteLimit = userPreferences.autoDeleteLimit,
+            spamAutoDeleteDays = userPreferences.spamAutoDeleteDays,
             lockScreenPrivacy = userPreferences.lockScreenPrivacy,
             appLanguage = userPreferences.appLanguage,
             allTabIndex = userPreferences.allTabIndex,
@@ -343,6 +348,12 @@ class ConversationsViewModel(
         _uiState.value = _uiState.value.copy(
             isDefaultSmsApp = repository.isDefaultSmsApp()
         )
+
+        // Spam the user asked to be rid of after N days goes before the list is read, so the rows
+        // it emptied disappear in the same pass. The repository throttles this internally.
+        if (_uiState.value.spamAutoDeleteDays > 0) {
+            runCatching { repository.purgeOldSpam(_uiState.value.spamAutoDeleteDays) }
+        }
 
         val cached = try {
             repository.getCachedThreads()
@@ -616,6 +627,17 @@ class ConversationsViewModel(
         loadThreads(silent = true, force = true)
     }
 
+    /** Turns the spam auto-delete on or off and applies it immediately (0 days = off). */
+    fun setSpamAutoDeleteDays(days: Int) {
+        val normalised = days.coerceIn(0, 365)
+        userPreferences.spamAutoDeleteDays = normalised
+        _uiState.value = _uiState.value.copy(spamAutoDeleteDays = normalised)
+        viewModelScope.launch {
+            repository.purgeOldSpam(normalised, minIntervalMillis = 0L)
+            loadThreads(silent = true, force = true)
+        }
+    }
+
     fun setDeliveryReportsEnabled(enabled: Boolean) {
         userPreferences.deliveryReports = enabled
         _uiState.value = _uiState.value.copy(deliveryReports = enabled)
@@ -720,6 +742,9 @@ class ConversationsViewModel(
     fun markAllConversationsRead(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             repository.markAllMessagesRead()
+            // Spam is stored already read, so the SMS provider update above leaves its badges
+            // untouched; the spam flags are what those badges count.
+            repository.markAllNewSpamSeen()
             loadThreads(silent = true, force = true)
             onComplete()
         }
@@ -748,9 +773,35 @@ class ConversationsViewModel(
         }
     }
 
+    /**
+     * Scroll position of the inbox list, remembered per tab.
+     *
+     * The screen itself is disposed while a chat is open, so without this the list came back at the
+     * top - the position has to live somewhere that outlives the composable. Only switching tabs is
+     * supposed to start at the first row, so [pendingScrollToTop] is raised by [selectTab] alone.
+     */
+    private val inboxScrollPositions = mutableStateMapOf<Long?, Int>()
+    var pendingScrollToTop by mutableStateOf(false)
+        private set
+
+    fun inboxScrollIndex(tabId: Long?): Int = inboxScrollPositions[tabId] ?: 0
+
+    fun rememberInboxScrollIndex(tabId: Long?, index: Int) {
+        inboxScrollPositions[tabId] = index
+    }
+
+    /** True exactly once per tab change, so the list jumps to the top on a real switch only. */
+    fun consumeScrollToTop(): Boolean {
+        if (!pendingScrollToTop) return false
+        pendingScrollToTop = false
+        return true
+    }
+
     fun selectTab(tabId: Long?) {
         val current = _uiState.value
         if (current.selectedTabId == tabId) return
+        // Re-entering the same tab (back from a chat) must not scroll; a different tab must.
+        pendingScrollToTop = true
         // The contacts-only filter is remembered, but filterThreads applies it to the All tab only.
         _uiState.value = current.copy(
             selectedTabId = tabId,

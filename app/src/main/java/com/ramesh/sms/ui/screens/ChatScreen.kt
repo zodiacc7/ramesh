@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -49,14 +51,13 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -85,6 +86,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -101,6 +103,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.res.stringResource
@@ -128,6 +131,9 @@ import com.ramesh.sms.theme.MessageAnimation
 import com.ramesh.sms.theme.PillShape
 import com.ramesh.sms.theme.RameshIcons
 import com.ramesh.sms.theme.SquircleCardShape
+import com.ramesh.sms.theme.bubbleBackground
+import com.ramesh.sms.theme.bubbleContent
+import com.ramesh.sms.theme.chatBubbleShape
 import com.ramesh.sms.theme.messageEnterTransition
 import com.ramesh.sms.theme.messageExitTransition
 import com.ramesh.sms.ui.components.ChatBackdropBackground
@@ -146,6 +152,7 @@ import com.ramesh.sms.ui.components.rememberUndoAvailable
 import com.ramesh.sms.ui.util.ContactUtils
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
+import com.ramesh.sms.ui.util.resolveTextDirection
 import com.ramesh.sms.ui.util.senderDisplayName
 import com.ramesh.sms.ui.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
@@ -576,6 +583,17 @@ fun ChatScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // The composer follows what is being typed: Persian (or a Persian/Latin
+                        // mix) reads right to left, English left to right. Switching the layout
+                        // direction of the field itself is what moves the cursor, the placeholder
+                        // and the starting edge together; a text-align alone would leave the caret
+                        // on the wrong side.
+                        CompositionLocalProvider(
+                            LocalLayoutDirection provides resolveTextDirection(
+                                inputText,
+                                LocalLayoutDirection.current
+                            )
+                        ) {
                         OutlinedTextField(
                             value = inputText,
                             onValueChange = { inputText = it },
@@ -603,6 +621,7 @@ fun ChatScreen(
                             ),
                             maxLines = 5
                         )
+                        }
 
                         if (state.availableSims.size > 1) {
                             SimToggleButton(
@@ -739,7 +758,13 @@ fun ChatScreen(
                     onOutsideTap = onClearTextSelection,
                     address = state.address,
                     contactName = state.contactName,
-                    photoUri = state.photoUri
+                    photoUri = state.photoUri,
+                    pendingSendText = state.pendingSendText,
+                    pendingSendSecondsLeft = state.pendingSendSecondsLeft,
+                    // Cancelling puts the text back in the composer, so nothing has to be retyped.
+                    onCancelPendingSend = {
+                        inputText = viewModel.cancelPendingSend() ?: inputText
+                    }
                 )
             }
 
@@ -1125,7 +1150,11 @@ private fun ChatMessageList(
     onOutsideTap: () -> Unit = {},
     address: String = "",
     contactName: String? = null,
-    photoUri: String? = null
+    photoUri: String? = null,
+    /** A message waiting out the send delay: shown in the list until it is sent or cancelled. */
+    pendingSendText: String? = null,
+    pendingSendSecondsLeft: Int = 0,
+    onCancelPendingSend: () -> Unit = {}
 ) {
     val look = AppearanceStore.current
     val simSlotMap = remember(availableSims) {
@@ -1153,6 +1182,18 @@ private fun ChatMessageList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 12.dp)
     ) {
+        // Sits at the bottom of the conversation, where the message will land: it is shown as a
+        // real bubble with a countdown and one way out, instead of the text vanishing into nothing
+        // for N seconds with no sign that anything is pending.
+        if (pendingSendText != null) {
+            item(key = "pending-send", contentType = "pending-send") {
+                PendingSendBubble(
+                    text = pendingSendText,
+                    secondsLeft = pendingSendSecondsLeft,
+                    onCancel = onCancelPendingSend
+                )
+            }
+        }
         itemsIndexed(
             items = reversedMessages,
             key = { _, message -> message.id },
@@ -1334,7 +1375,7 @@ private fun SelectionTopBar(
             IconButton(onClick = { onShare(selectedBodies) }) {
                 Icon(
                     // Same glyph as the strip, so "share" looks like one thing across the app.
-                    imageVector = Icons.Default.Share,
+                    imageVector = RameshIcons.Share,
                     contentDescription = stringResource(R.string.chat_menu_share)
                 )
             }
@@ -1351,7 +1392,7 @@ private fun SelectionTopBar(
             // the second tap deletes. Nothing else is asked.
             IconButton(onClick = onDelete) {
                 Icon(
-                    imageVector = if (deleteArmed) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                    imageVector = RameshIcons.Trash,
                     contentDescription = stringResource(
                         if (deleteArmed) R.string.chat_delete_again else R.string.chat_delete_selected
                     ),
@@ -1406,6 +1447,84 @@ private fun SelectionTopBar(
             actionIconContentColor = MaterialTheme.colorScheme.onPrimary
         )
     )
+}
+
+/**
+ * The message waiting out the send delay.
+ *
+ * It is drawn as a sent bubble (same side, same colours) so it reads as "this is going out", with a
+ * countdown and a Cancel button directly underneath. Cancelling hands the text back to the composer
+ * instead of dropping it, which is what the delay is for.
+ */
+@Composable
+private fun PendingSendBubble(
+    text: String,
+    secondsLeft: Int,
+    onCancel: () -> Unit
+) {
+    val look = AppearanceStore.current
+    val tone = look.sentTone
+    val container = tone.bubbleBackground(true)
+    val content = tone.bubbleContent(true)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.End
+    ) {
+        Column(horizontalAlignment = Alignment.End) {
+            Surface(
+                shape = chatBubbleShape(
+                    outgoing = true,
+                    style = look.bubbleStyle,
+                    tail = look.bubbleTail
+                ),
+                color = container,
+                // Dashed-looking edge via alpha: it says "not sent yet" without a second colour.
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier.widthIn(max = 280.dp)
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium.contentAware(),
+                    color = content,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp, end = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.chat_send_pending, secondsLeft),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                TextButton(
+                    onClick = onCancel,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.chat_send_cancel),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
 }
 
 private val ReactionEmojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉")
