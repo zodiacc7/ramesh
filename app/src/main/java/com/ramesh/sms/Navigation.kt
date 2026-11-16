@@ -98,13 +98,13 @@ fun MainNavigation(
             entry<ChatNav> { nav ->
                 ChatScreen(
                     nav = nav,
-                    onBackClick = { backStack.removeLastOrNull() },
+                    onBackClick = { if (backStack.size > 1) backStack.removeLastOrNull() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
             entry<SettingsNav> {
                 SettingsScreen(
-                    onBackClick = { backStack.removeLastOrNull() },
+                    onBackClick = { if (backStack.size > 1) backStack.removeLastOrNull() },
                     onOpenFilterStudio = { backStack.add(FilterStudioNav) },
                     inboxViewModel = conversationsViewModel,
                     modifier = Modifier.fillMaxSize()
@@ -112,15 +112,17 @@ fun MainNavigation(
             }
             entry<FilterStudioNav> {
                 FilterStudioScreen(
-                    onBackClick = { backStack.removeLastOrNull() },
+                    onBackClick = { if (backStack.size > 1) backStack.removeLastOrNull() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
             entry<ComposeNav> { nav ->
                 ComposeScreen(
-                    onBackClick = { backStack.removeLastOrNull() },
+                    onBackClick = { if (backStack.size > 1) backStack.removeLastOrNull() },
+                    // Replace the compose screen with the chat it just sent into. Guarded so the
+                    // stack can never be emptied between the two calls.
                     onNavigateToChat = { chatNav ->
-                        backStack.removeLastOrNull()
+                        if (backStack.size > 1) backStack.removeLastOrNull()
                         backStack.add(chatNav)
                     },
                     initialAddress = nav.address,
@@ -130,15 +132,20 @@ fun MainNavigation(
             }
             entry<TestLabNav> {
                 com.ramesh.sms.testing.TestLabScreen(
-                    onBackClick = { backStack.removeLastOrNull() },
+                    onBackClick = { if (backStack.size > 1) backStack.removeLastOrNull() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
     )
 
-    // Handle system back button so popTransitionSpec is used (same animation as app's back button).
-    BackHandler(enabled = true) {
-        backStack.removeLastOrNull()
+    // Handle the system back button so popTransitionSpec is used (same animation as the app's own
+    // back button) - but only while there is something to pop. On the inbox itself the stack holds
+    // a single entry, and NavDisplay throws "backstack cannot be empty" if that last entry is
+    // removed; letting the event fall through to the system is also what makes Back close the app
+    // normally instead of crashing on exit.
+    val canNavigateBack = backStack.size > 1
+    BackHandler(enabled = canNavigateBack) {
+        if (backStack.size > 1) backStack.removeLastOrNull()
     }
 }

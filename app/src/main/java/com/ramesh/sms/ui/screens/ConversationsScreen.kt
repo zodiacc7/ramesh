@@ -102,8 +102,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -1357,8 +1360,11 @@ private fun ConversationItem(
     }
     val displayName = senderDisplayName(thread.contactName, thread.address)
 
+    // A selected row is tinted with the theme's primary at a low alpha *plus* a left/right accent
+    // bar, because a primary tint on a primary-heavy theme is the classic "I cannot tell what is
+    // selected" case. The tint keeps the row's text readable; the bar makes the state unambiguous.
     val itemBgColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
     } else {
         Color.Transparent
     }
@@ -1377,6 +1383,25 @@ private fun ConversationItem(
         SpamWarningLight.copy(alpha = 0.9f)
     }
 
+    // The accent bar is drawn as an explicit overlay on the start edge, so "selected" is readable
+    // even when the tint happens to match the theme.
+    // Read the colour during composition: the draw lambda below is not composable.
+    val selectionAccentColor = MaterialTheme.colorScheme.primary
+    val selectionAccent = if (isSelected) {
+        Modifier.drawBehind {
+            val barWidth = 4.dp.toPx()
+            // RTL-aware: the bar sits on the leading edge of the row, not always on the left.
+            val left = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - barWidth
+            drawRect(
+                color = selectionAccentColor,
+                topLeft = Offset(left, 0f),
+                size = Size(barWidth, size.height)
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1387,6 +1412,7 @@ private fun ConversationItem(
                     else -> itemBgColor
                 }
             )
+            .then(selectionAccent)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick

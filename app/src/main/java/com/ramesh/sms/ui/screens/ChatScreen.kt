@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -81,7 +82,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -564,17 +564,6 @@ fun ChatScreen(
                 Column(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    if (state.pendingSendSecondsLeft > 0) {
-                        PendingSendBar(
-                            secondsLeft = state.pendingSendSecondsLeft,
-                            onCancel = {
-                                val restored = viewModel.cancelPendingSend()
-                                if (!restored.isNullOrBlank()) {
-                                    inputText = restored
-                                }
-                            }
-                        )
-                    }
                     if (look.showCharacterCounter) {
                         SmsSegmentCounter(text = inputText)
                     }
@@ -1375,7 +1364,7 @@ private fun SelectionTopBar(
             IconButton(onClick = { onShare(selectedBodies) }) {
                 Icon(
                     // Same glyph as the strip, so "share" looks like one thing across the app.
-                    imageVector = RameshIcons.Share,
+                    imageVector = Icons.Default.Share,
                     contentDescription = stringResource(R.string.chat_menu_share)
                 )
             }
@@ -1575,33 +1564,4 @@ private fun ReactionPickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.chat_close)) }
         }
     )
-}
-
-/** Countdown bar shown while a send-delay is running; Cancel puts the text back in the composer. */
-@Composable
-private fun PendingSendBar(secondsLeft: Int, onCancel: () -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 6.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.chat_sending_in, secondsLeft),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.chat_cancel), fontWeight = FontWeight.Bold)
-            }
-        }
-    }
 }
