@@ -83,7 +83,7 @@
     <string name="settings_storage_header">ذخیره‌سازی</string>
     <string name="settings_storage_sub">نگذارید گفتگوها بی‌نهایت بزرگ شوند</string>
     <string name="settings_auto_delete">حذف خودکار پیام‌های قدیمی</string>
-    <string name="settings_auto_delete_sub">برای هر گفتگو. پیام‌های قدیمی‌تر پس از رسیدن به حد مجاز از گوشی حذف می‌شوند؛ پیش‌فرض خاموش است.</string>
+    <string name="settings_auto_delete_sub">برای هر گفتگو. وقتی روشن باشد، به‌محض عبور گفتگو از حدِ زیر، پیام‌های قدیمی‌تر از گوشی حذف می‌شوند. پیش‌فرض خاموش است.</string>
     <string name="settings_reset_header">بازنشانی</string>
     <string name="settings_restore_look">بازگردانی ظاهر پیش‌فرض</string>
     <string name="settings_restore_look_sub">تم فیروزه‌ای، حباب کلاسیک، بدون پس‌زمینه</string>
@@ -96,6 +96,7 @@
     <string name="settings_swipe_delete_sub">با کشیدن چپ یا راست یک گفتگو، دکمهٔ حذف برای پنج ثانیه نمایش داده می‌شود</string>
     <string name="settings_seconds_value">%1$d ثانیه</string>
     <string name="settings_messages_count">%1$s پیام</string>
+    <string name="settings_auto_delete_limit">نگه‌داشتن حداکثر</string>
     <string name="settings_message_animation">انیمیشن پیام‌ها</string>
     <string name="settings_message_animation_sub">نحوهٔ باز و بسته شدن گفتگوها</string>
     <string name="settings_animation_preview_page">گفتگو</string>
@@ -120,7 +121,7 @@
     <string name="settings_new_spam">نمایش اسپم‌های جدید</string>
     <string name="settings_new_spam_sub">اسپم فیلترشده‌ای که تازه رسیده و باز نشده، هم در صندوق ورودی و هم داخل گفتگو علامت‌گذاری شود</string>
     <string name="settings_spam_auto_delete">حذف خودکار اسپم‌ها</string>
-    <string name="settings_spam_auto_delete_sub">اسپم‌های فیلترشده بعد از تعداد روزِ زیر خودکار پاک می‌شوند. پیش‌فرض خاموش است.</string>
+    <string name="settings_spam_auto_delete_sub">اسپم‌های فیلترشده وقتی از تعداد روزِ زیر قدیمی‌تر شوند خودکار پاک می‌شوند. پیش‌فرض خاموش است.</string>
     <string name="settings_spam_auto_delete_days">حذف اسپم‌های قدیمی‌تر از</string>
     <string name="settings_days_count">%1$d روز</string>
     <string name="settings_crash_log">ارسال گزارش آخرین کرش</string>

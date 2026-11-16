@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -216,8 +215,9 @@ fun MessageActionBar(
                         )
                     }
                     BarAction(
-                        // Three nodes joined by two lines, exactly the sample; Material ships it.
-                        icon = Icons.Default.Share,
+                        // Three nodes joined by two lines, exactly the sample. Material's glyph
+                        // has smaller nodes and reads as a different icon next to these.
+                        icon = RameshIcons.Share,
                         label = stringResource(R.string.chat_menu_share),
                         onClick = onShare
                     )

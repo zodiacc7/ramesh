@@ -112,10 +112,13 @@ import com.ramesh.sms.ui.components.SettingsRowDivider
 import com.ramesh.sms.ui.components.SettingsSectionHeader
 import com.ramesh.sms.ui.components.SettingsSliderRow
 import com.ramesh.sms.ui.components.SettingsSwitchRow
+import com.ramesh.sms.ui.components.SpamAutoDeleteDays
 import com.ramesh.sms.ui.components.autoDeleteLimitForProgress
 import com.ramesh.sms.ui.components.hasPersistedReadAccess
 import com.ramesh.sms.ui.components.persistWallpaperAccess
 import com.ramesh.sms.ui.components.progressForAutoDeleteLimit
+import com.ramesh.sms.ui.components.spamAutoDeleteDaysForStep
+import com.ramesh.sms.ui.components.spamAutoDeleteStep
 import com.ramesh.sms.ui.viewmodel.ConversationsViewModel
 import com.ramesh.sms.util.CrashLog
 import kotlin.math.roundToInt
@@ -155,9 +158,13 @@ fun SettingsScreen(
     var autoDeleteProgress by remember(inboxState.autoDeleteLimit) {
         mutableFloatStateOf(progressForAutoDeleteLimit(inboxState.autoDeleteLimit))
     }
-    // 0 = off, 1..365 = days. The slider only becomes visible once the switch is on.
+    // 0 = off, otherwise the number of days. The slider only becomes visible once the switch is on,
+    // and it snaps to [SpamAutoDeleteDays] instead of running 1..90 in a straight line.
     var spamAutoDeleteDays by remember(inboxState.spamAutoDeleteDays) {
         mutableIntStateOf(inboxState.spamAutoDeleteDays)
+    }
+    var spamDaysStep by remember(inboxState.spamAutoDeleteDays) {
+        mutableIntStateOf(spamAutoDeleteStep(inboxState.spamAutoDeleteDays))
     }
 
     // Read once: the file is small, and reading it on every recomposition of a long list is waste.
@@ -695,28 +702,40 @@ fun SettingsScreen(
             }
             item(key = "storage-group") {
                 SettingsGroup {
-                    val pendingAutoDelete = autoDeleteLimitForProgress(autoDeleteProgress)
-                    SettingsSliderRow(
+                    // Switch first, slider second: the limit means nothing while the feature is off,
+                    // and a slider whose left end was "Off" could be dragged by accident.
+                    val autoDeleteOn = inboxState.autoDeleteLimit > 0
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Delete,
                         title = stringResource(R.string.settings_auto_delete),
                         subtitle = stringResource(R.string.settings_auto_delete_sub),
-                        value = autoDeleteProgress,
-                        valueRange = 0f..100f,
-                        valueLabel = if (pendingAutoDelete == 0) {
-                            stringResource(R.string.settings_off)
-                        } else {
-                            stringResource(
+                        checked = autoDeleteOn,
+                        onCheckedChange = { enabled ->
+                            inboxViewModel.setAutoDeleteLimit(
+                                if (enabled) DEFAULT_AUTO_DELETE_LIMIT else 0
+                            )
+                        },
+                        showDivider = autoDeleteOn
+                    )
+                    if (autoDeleteOn) {
+                        val pendingAutoDelete = autoDeleteLimitForProgress(autoDeleteProgress)
+                        SettingsSliderRow(
+                            title = stringResource(R.string.settings_auto_delete_limit),
+                            value = autoDeleteProgress,
+                            valueRange = 1f..100f,
+                            valueLabel = stringResource(
                                 R.string.settings_messages_count,
                                 java.text.NumberFormat.getIntegerInstance()
                                     .format(pendingAutoDelete.toLong())
-                            )
-                        },
-                        onValueChange = { autoDeleteProgress = it },
-                        onValueChangeFinished = {
-                            inboxViewModel.setAutoDeleteLimit(
-                                autoDeleteLimitForProgress(autoDeleteProgress)
-                            )
-                        }
-                    )
+                            ),
+                            onValueChange = { autoDeleteProgress = it },
+                            onValueChangeFinished = {
+                                inboxViewModel.setAutoDeleteLimit(
+                                    autoDeleteLimitForProgress(autoDeleteProgress)
+                                )
+                            }
+                        )
+                    }
                     SettingsSwitchRow(
                         icon = Icons.Default.Shield,
                         title = stringResource(R.string.settings_spam_auto_delete),
@@ -725,6 +744,7 @@ fun SettingsScreen(
                         onCheckedChange = { enabled ->
                             val next = if (enabled) DEFAULT_SPAM_AUTO_DELETE_DAYS else 0
                             spamAutoDeleteDays = next
+                            spamDaysStep = spamAutoDeleteStep(next)
                             inboxViewModel.setSpamAutoDeleteDays(next)
                         },
                         showDivider = spamAutoDeleteDays > 0
@@ -732,16 +752,18 @@ fun SettingsScreen(
                     if (spamAutoDeleteDays > 0) {
                         SettingsSliderRow(
                             title = stringResource(R.string.settings_spam_auto_delete_days),
-                            value = spamAutoDeleteDays.toFloat(),
-                            valueRange = 1f..90f,
-                            steps = 88,
+                            value = spamDaysStep.toFloat(),
+                            valueRange = 0f..(SpamAutoDeleteDays.size - 1).toFloat(),
+                            steps = SpamAutoDeleteDays.size - 2,
                             valueLabel = stringResource(
                                 R.string.settings_days_count,
-                                spamAutoDeleteDays
+                                spamAutoDeleteDaysForStep(spamDaysStep)
                             ),
-                            onValueChange = { spamAutoDeleteDays = it.toInt().coerceAtLeast(1) },
+                            onValueChange = { spamDaysStep = it.roundToInt() },
                             onValueChangeFinished = {
-                                inboxViewModel.setSpamAutoDeleteDays(spamAutoDeleteDays)
+                                val days = spamAutoDeleteDaysForStep(spamDaysStep)
+                                spamAutoDeleteDays = days
+                                inboxViewModel.setSpamAutoDeleteDays(days)
                             }
                         )
                     }
@@ -1062,6 +1084,9 @@ private fun BubblePreviewCard(look: Appearance) {
 
 /** Days the spam auto-delete starts at when the switch is turned on. Never zero. */
 private const val DEFAULT_SPAM_AUTO_DELETE_DAYS = 30
+
+/** Where the auto-delete slider starts when it is switched on: about a month of messages. */
+private const val DEFAULT_AUTO_DELETE_LIMIT = 500
 
 /** Replays the screen transition inside the conversation preview card when it is tapped. */
 @Composable

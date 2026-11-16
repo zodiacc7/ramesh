@@ -361,6 +361,26 @@ fun progressForAutoDeleteLimit(limit: Int): Float {
 }
 
 /**
+ * The day counts the spam auto-delete slider offers.
+ *
+ * A linear 1..90 slider spends nine tenths of its width on the 1..10 range that almost nobody
+ * needs, and makes 30 and 60 - the values people actually pick - land on invisible steps. These are
+ * the stops the slider snaps to instead: every day up to ten, then tens.
+ */
+val SpamAutoDeleteDays = listOf(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    20, 30, 40, 50, 60, 70, 80, 90
+)
+
+/** Slider position (an index into [SpamAutoDeleteDays]) for a stored number of days. */
+fun spamAutoDeleteStep(days: Int): Int =
+    SpamAutoDeleteDays.indexOfFirst { it >= days }.let { if (it < 0) SpamAutoDeleteDays.lastIndex else it }
+
+/** Days for a slider position; clamps instead of throwing on an out-of-range index. */
+fun spamAutoDeleteDaysForStep(step: Int): Int =
+    SpamAutoDeleteDays[step.coerceIn(0, SpamAutoDeleteDays.lastIndex)]
+
+/**
  * Option row where each pill carries a colour dot (bubble and wallpaper colours).
  * A null colour means "follow the theme accent".
  */
