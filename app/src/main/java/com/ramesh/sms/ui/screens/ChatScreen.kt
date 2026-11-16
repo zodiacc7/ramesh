@@ -59,7 +59,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -109,7 +108,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -230,8 +228,6 @@ fun ChatScreen(
     // window over the conversation. The tick forces a re-selection when Copy is tapped again.
     var inlineSelectMessageId by remember { mutableStateOf<Long?>(null) }
     var inlineSelectTick by remember { mutableStateOf(0) }
-    // The live range inside the Copy field. Null until the field reports one.
-    var inlineSelectionRange by remember { mutableStateOf<TextRange?>(null) }
     // Every action closes the strip the same way: fade out, then drop it. Removing it outright made
     // it pop while the fade-in on the way in was still visible.
     val closeActionBar: () -> Unit = {
@@ -755,7 +751,6 @@ fun ChatScreen(
                         // Tapping another bubble moves the strip there and leaves the previous
                         // selection mode behind.
                         inlineSelectMessageId = null
-                        inlineSelectionRange = null
                         deleteArmed = false
                         actionBarVisible = true
                         actionBarAnchor = bubbleBounds[message.id]?.translate(
@@ -769,31 +764,6 @@ fun ChatScreen(
                     selectionResetTick = selectionResetTick,
                     inlineSelectMessageId = inlineSelectMessageId,
                     inlineSelectTick = inlineSelectTick,
-                    onInlineSelectionChange = { range ->
-                        if (inlineSelectionRange != range) inlineSelectionRange = range
-                    },
-                    onInlineCopy = {
-                        val body = state.messages
-                            .firstOrNull { it.id == inlineSelectMessageId }
-                            ?.body
-                            .orEmpty()
-                        val range = inlineSelectionRange
-                        val text = if (range == null || body.isEmpty()) {
-                            body
-                        } else {
-                            val from = range.min.coerceIn(0, body.length)
-                            val to = range.max.coerceIn(0, body.length)
-                            if (to > from) body.substring(from, to) else body
-                        }
-                        if (text.isNotEmpty()) copyToClipboard(text)
-                        inlineSelectMessageId = null
-                        inlineSelectionRange = null
-                    },
-                    onInlineSelectAll = {
-                        inlineSelectionRange = null
-                        inlineSelectTick += 1
-                    },
-                    onInlineClose = onClearTextSelection,
                     onBubbleTouched = { id -> activeTextBubbleId = id },
                     onOutsideTap = onClearTextSelection,
                     address = state.address,
@@ -865,12 +835,11 @@ fun ChatScreen(
                             copyToClipboard(findOtpHighlight(message.body)?.code.orEmpty())
                         },
                         onCopy = {
-                            // Copy puts the bubble into selection mode with all of it selected and
-                            // stops there: nothing is copied yet, so the clipboard is not overwritten
-                            // by a mistaken tap. The actual copy is one of the actions offered under
-                            // the bubble, and tapping anywhere else leaves this mode.
+                            // Copy only enters selection mode: the whole message comes up selected
+                            // with Android's own Copy / Select all toolbar, so nothing is copied
+                            // before the user has read it and the platform menu does the work. A tap
+                            // anywhere else leaves the mode.
                             closeActionBar()
-                            inlineSelectionRange = null
                             inlineSelectMessageId = message.id
                             inlineSelectTick += 1
                         },
@@ -1187,11 +1156,6 @@ private fun ChatMessageList(
     /** Bubble that Copy turned into selectable text, and a tick that re-selects it each time. */
     inlineSelectMessageId: Long? = null,
     inlineSelectTick: Int = 0,
-    onInlineSelectionChange: (TextRange) -> Unit = {},
-    /** Copy the current selection (or the whole bubble when nothing is reported). */
-    onInlineCopy: () -> Unit = {},
-    onInlineSelectAll: () -> Unit = {},
-    onInlineClose: () -> Unit = {},
     onBubbleTouched: (Long) -> Unit = {},
     onOutsideTap: () -> Unit = {},
     address: String = "",
@@ -1317,42 +1281,30 @@ private fun ChatMessageList(
                     } else {
                         null
                     }
-                    val isInlineSelectTarget = message.id == inlineSelectMessageId
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        MessageBubble(
-                            message = message,
-                            isHighlighted = isHighlighted,
-                            simSlotNumber = simSlotNumber,
-                            useShamsi = showShamsiDate,
-                            appLanguage = appLanguage,
-                            onToggleDateFormat = onDateTapAction,
-                            onLongClick = { onLongClick(message) },
-                            onTap = { if (!isSelectionMode) onTapBubble(message) },
-                            onBubbleBounds = { bounds -> onBubbleBounds(message.id, bounds) },
-                            inlineSelectKey = if (isInlineSelectTarget) {
-                                inlineSelectTick
-                            } else {
-                                0
-                            },
-                            onInlineSelectionChange = onInlineSelectionChange,
-                            isSelectionMode = isSelectionMode,
-                            isSelected = message.id in selectedMessageIds,
-                            onToggleSelect = { onTapMessage(message) },
-                            selectionResetKey = bubbleResetKey,
-                            onBubbleTouched = { onBubbleTouched(message.id) },
-                            onOutsideTap = onOutsideTap,
-                            showAvatar = showAvatarForMessage,
-                            avatar = avatarSlot
-                        )
-                        if (isInlineSelectTarget) {
-                            InlineSelectionActions(
-                                alignEnd = message.isSent,
-                                onCopy = onInlineCopy,
-                                onSelectAll = onInlineSelectAll,
-                                onClose = onInlineClose
-                            )
-                        }
-                    }
+                    MessageBubble(
+                        message = message,
+                        isHighlighted = isHighlighted,
+                        simSlotNumber = simSlotNumber,
+                        useShamsi = showShamsiDate,
+                        appLanguage = appLanguage,
+                        onToggleDateFormat = onDateTapAction,
+                        onLongClick = { onLongClick(message) },
+                        onTap = { if (!isSelectionMode) onTapBubble(message) },
+                        onBubbleBounds = { bounds -> onBubbleBounds(message.id, bounds) },
+                        inlineSelectKey = if (message.id == inlineSelectMessageId) {
+                            inlineSelectTick
+                        } else {
+                            0
+                        },
+                        isSelectionMode = isSelectionMode,
+                        isSelected = message.id in selectedMessageIds,
+                        onToggleSelect = { onTapMessage(message) },
+                        selectionResetKey = bubbleResetKey,
+                        onBubbleTouched = { onBubbleTouched(message.id) },
+                        onOutsideTap = onOutsideTap,
+                        showAvatar = showAvatarForMessage,
+                        avatar = avatarSlot
+                    )
                 }
             }
             }
@@ -1633,90 +1585,4 @@ private fun ReactionPickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.chat_close)) }
         }
     )
-}
-
-/**
- * The actions offered under a bubble whose text was just put into selection mode.
- *
- * "Copy" in the strip used to copy immediately and then select everything, which fires the clipboard
- * before the user has even read the text. This row is the confirmation step instead: nothing touches
- * the clipboard until Copy is tapped here, Select all re-selects the whole bubble, and the close
- * button (or a tap anywhere else) leaves the mode without copying anything.
- */
-@Composable
-private fun InlineSelectionActions(
-    alignEnd: Boolean,
-    onCopy: () -> Unit,
-    onSelectAll: () -> Unit,
-    onClose: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp),
-        horizontalArrangement = if (alignEnd) Arrangement.End else Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            shape = PillShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                InlineSelectionButton(
-                    label = stringResource(R.string.chat_copy),
-                    icon = Icons.Default.ContentCopy,
-                    onClick = onCopy
-                )
-                InlineSelectionButton(
-                    label = stringResource(R.string.chat_select_all),
-                    icon = Icons.Default.SelectAll,
-                    onClick = onSelectAll
-                )
-                IconButton(onClick = onClose, modifier = Modifier.size(34.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.chat_close),
-                        modifier = Modifier.size(17.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InlineSelectionButton(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(PillShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(15.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
 }

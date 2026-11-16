@@ -357,7 +357,12 @@ fun ConversationsScreen(
                 onAddToTab = { showAddToTabDialog = true },
                 onOpenSearch = { isSearchOpen = true },
                 onMarkAllRead = {
-                    val hasUnread = state.threads.any { it.unreadCount > 0 }
+                    // Spam is stored already read (it never notifies), so `unreadCount` is 0 for a
+                    // conversation whose only "new" thing is filtered spam. Counting that as "all
+                    // already read" is why the option did nothing when only spam was outstanding.
+                    val hasUnread = state.threads.any {
+                        it.unreadCount > 0 || it.newSpamCount > 0
+                    }
                     if (hasUnread) {
                         viewModel.markAllConversationsRead {
                             Toast.makeText(

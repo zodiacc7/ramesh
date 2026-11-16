@@ -854,6 +854,19 @@ class SmsRepository(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to mark all messages read", e)
         }
+        // The conversation rows carry their own `read` flag, which is what other messaging apps
+        // and the conversation provider read. Marking every message without it left those rows
+        // still claiming unread messages.
+        try {
+            context.contentResolver.update(
+                Telephony.Threads.CONTENT_URI,
+                ContentValues().apply { put(Telephony.Threads.READ, 1) },
+                "${Telephony.Threads.READ} = 0",
+                null
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not clear the conversation unread flags", e)
+        }
     }
 
     private fun readAndSeenValues(): ContentValues {
