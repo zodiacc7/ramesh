@@ -15,7 +15,6 @@
     <string name="chat_delete">Delete</string>
     <string name="chat_cancel">Cancel</string>
     <string name="chat_close">Close</string>
-    <string name="chat_sending_in">Sending in %1$d s</string>
     <string name="chat_sms_message">SMS message</string>
     <string name="chat_composer_hint">Text message (SMS)…</string>
     <string name="chat_menu_share">Share</string>

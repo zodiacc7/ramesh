@@ -42,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,6 +67,8 @@ import com.ramesh.sms.theme.chatBubbleShape
 import com.ramesh.sms.ui.util.SmsDateFormats
 import com.ramesh.sms.ui.util.contentAware
 import com.ramesh.sms.ui.util.forMessageBody
+import com.ramesh.sms.ui.util.selectionHandleColor
+import com.ramesh.sms.ui.util.selectionHighlight
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -112,10 +116,28 @@ fun MessageBubble(
     val tone = if (isSent) look.sentTone else look.receivedTone
     val containerColor = tone.bubbleBackground(isSent)
     val contentColor = tone.bubbleContent(isSent)
+    // A selected/highlighted bubble gets a 2 dp ring in the contrast colour rather than the theme's
+    // primary: on a primary-coloured bubble a primary ring is invisible.
     val border = when {
-        emphasized -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        emphasized -> BorderStroke(
+            2.dp,
+            // Dark bubble -> light ring, light bubble -> dark ring.
+            if (containerColor.luminance() < 0.5f) Color.White else Color.Black
+        )
         isSent -> null
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+    }
+    // A ticked bubble is also filled, not just ringed: a ring alone disappears in a dense list and
+    // the fill is what "this one is selected" actually reads as. The blend uses the bubble's own
+    // brightness so it works on light and dark bubbles alike.
+    val surfaceColor = if (isSelected) {
+        lerp(
+            containerColor,
+            if (containerColor.luminance() < 0.5f) Color.White else Color.Black,
+            0.18f
+        )
+    } else {
+        containerColor
     }
     val dateText = remember(message.date, useShamsi, appLanguage) {
         SmsDateFormats.formatDate(message.date, useShamsi, appLanguage)
@@ -162,7 +184,7 @@ fun MessageBubble(
             Surface(
                 onClick = onToggleSelect,
                 shape = bubbleShape,
-                color = containerColor,
+                color = surfaceColor,
                 border = border,
                 shadowElevation = 0.dp,
                 modifier = Modifier.widthIn(min = 80.dp, max = maxBubbleWidth)
@@ -170,6 +192,7 @@ fun MessageBubble(
                 BubbleContent(
                     message = message,
                     contentColor = contentColor,
+                    bubbleColor = surfaceColor,
                     dateText = dateText,
                     timeText = timeText,
                     isSent = isSent,
@@ -183,7 +206,7 @@ fun MessageBubble(
         } else {
             Surface(
                 shape = bubbleShape,
-                color = containerColor,
+                color = surfaceColor,
                 border = border,
                 shadowElevation = 0.dp,
                 modifier = Modifier
@@ -207,6 +230,7 @@ fun MessageBubble(
                 BubbleContent(
                     message = message,
                     contentColor = contentColor,
+                    bubbleColor = surfaceColor,
                     dateText = dateText,
                     timeText = timeText,
                     isSent = isSent,
@@ -229,6 +253,8 @@ fun MessageBubble(
 private fun BubbleContent(
     message: SmsMessage,
     contentColor: Color,
+    /** The bubble's own background, so the text selection can contrast with it. */
+    bubbleColor: Color,
     dateText: String,
     timeText: String,
     isSent: Boolean,
@@ -264,13 +290,12 @@ private fun BubbleContent(
                     mutableStateOf(TextFieldValue(message.body, TextRange(0, message.body.length)))
                 }
                 // The selection has to be visible *on the bubble*, and the bubble is drawn in the
-                // user's own tone - often the same accent colour the default selection uses. The
-                // highlight is therefore derived from the bubble's content colour (white on a dark
-                // bubble, dark on a light one) and kept at a low alpha, so it always contrasts with
-                // whatever the bubble is painted with.
+                // user's own tone - often the same accent colour the default selection uses. Both
+                // the veil and the handles are therefore derived from the bubble's brightness, not
+                // from the theme's primary, so no bubble can hide its own selection.
                 val selectionColors = TextSelectionColors(
-                    handleColor = contentColor,
-                    backgroundColor = contentColor.copy(alpha = 0.38f)
+                    handleColor = selectionHandleColor(bubbleColor),
+                    backgroundColor = selectionHighlight(bubbleColor)
                 )
                 CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
                     BasicTextField(

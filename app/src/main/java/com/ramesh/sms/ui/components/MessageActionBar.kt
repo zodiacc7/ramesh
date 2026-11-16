@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -215,8 +216,8 @@ fun MessageActionBar(
                         )
                     }
                     BarAction(
-                        // The reference glyph, which carries an arrowhead on the upper node.
-                        icon = RameshIcons.Share,
+                        // Three nodes joined by two lines, exactly the sample; Material ships it.
+                        icon = Icons.Default.Share,
                         label = stringResource(R.string.chat_menu_share),
                         onClick = onShare
                     )
@@ -245,9 +246,10 @@ fun MessageActionBar(
                         onClick = onInfo
                     )
                     BarAction(
-                        // Check plus rules: it enters selection mode with this message selected.
-                        // The bare double check belongs to "mark as read".
-                        icon = RameshIcons.SelectList,
+                        // Bracket with a check through it, as in the sample: it enters selection
+                        // mode with this message already selected. The bare check belongs to
+                        // "mark as read".
+                        icon = RameshIcons.SelectCheck,
                         label = stringResource(R.string.chat_menu_select),
                         onClick = onSelect
                     )

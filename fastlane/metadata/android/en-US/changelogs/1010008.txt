@@ -1,0 +1,19 @@
+Ramesh 1.1.0.08 (build 1010008) — pre-release.
+
+The crash from the reported log is fixed: leaving the app with Back on the inbox removed the last screen from the navigation stack, and the navigation library refuses to run with an empty stack. Back now only pops when there is somewhere to go back to, so the inbox simply sends the app to the background.
+
+Icons, redrawn against the samples:
+- Forward is the arrow from the picture: a solid triangle head with the tail curving down from it.
+- Select (check-in) is the rounded bracket open on the right with a check inside; it replaced the old "two lines" check.
+- Share is the three-node glyph with two connecting lines and no arrowhead, as in the sample.
+
+Fixes:
+- Selected conversations and selected messages are now unmistakable. The highlight is derived from the brightness of the surface underneath (a light veil on dark, a dark veil on light) instead of the theme's primary, which used to blend into a primary-coloured row or bubble. A selected row also gets a 4 dp accent bar on its leading edge, and a selected bubble is filled as well as ringed.
+- The copy highlight inside a bubble uses the same brightness rule, so it no longer disappears on the accent-coloured bubbles.
+
+Changed:
+- The large "sending in N s" bar above the editor is gone. The pending bubble under the message, with its countdown and Cancel button, is the only send-delay indicator.
+
+Dates are untouched in this build.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.
