@@ -41,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
@@ -100,8 +102,6 @@ fun MessageBubble(
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
     selectionResetKey: Any = Unit,
-    /** Reports the live selection of the Copy field, so the caller can copy just that range. */
-    onInlineSelectionChange: (TextRange) -> Unit = {},
     onBubbleTouched: () -> Unit = {},
     onOutsideTap: () -> Unit = {},
     showAvatar: Boolean = false,
@@ -203,8 +203,7 @@ fun MessageBubble(
                     onToggleDateFormat = onToggleDateFormat,
                     selectable = false,
                     tailPadding = tailPadding,
-                    inlineSelectKey = inlineSelectKey,
-                    onInlineSelectionChange = onInlineSelectionChange
+                    inlineSelectKey = inlineSelectKey
                 )
             }
         } else {
@@ -243,8 +242,7 @@ fun MessageBubble(
                     selectable = true,
                     tailPadding = tailPadding,
                     selectionResetKey = selectionResetKey,
-                    inlineSelectKey = inlineSelectKey,
-                    onInlineSelectionChange = onInlineSelectionChange
+                    inlineSelectKey = inlineSelectKey
                 )
             }
         }
@@ -268,8 +266,7 @@ private fun BubbleContent(
     selectable: Boolean,
     tailPadding: androidx.compose.ui.unit.Dp,
     selectionResetKey: Any = Unit,
-    inlineSelectKey: Int = 0,
-    onInlineSelectionChange: (TextRange) -> Unit = {}
+    inlineSelectKey: Int = 0
 ) {
     val look = AppearanceStore.current
     val scale = look.chatFontSize.scale
@@ -295,10 +292,11 @@ private fun BubbleContent(
                 var selection by remember(message.id, inlineSelectKey) {
                     mutableStateOf(TextFieldValue(message.body, TextRange(0, message.body.length)))
                 }
-                // Hand the range upwards so the "Copy" action under the bubble copies what is
-                // actually selected, not always the whole message.
-                LaunchedEffect(selection.selection, inlineSelectKey) {
-                    onInlineSelectionChange(selection.selection)
+                // Focusing the field is what raises Android's own selection toolbar (Copy / Select
+                // all / Share), so the message uses the platform menu instead of a hand-made one.
+                val inlineFocus = remember(message.id, inlineSelectKey) { FocusRequester() }
+                LaunchedEffect(message.id, inlineSelectKey) {
+                    runCatching { inlineFocus.requestFocus() }
                 }
                 // The selection has to be visible *on the bubble*, and the bubble is drawn in the
                 // user's own tone - often the same accent colour the default selection uses. Both
@@ -315,7 +313,9 @@ private fun BubbleContent(
                         readOnly = true,
                         textStyle = bodyStyle.merge(TextStyle(color = contentColor)),
                         cursorBrush = SolidColor(Color.Transparent),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(inlineFocus)
                     )
                 }
             } else {

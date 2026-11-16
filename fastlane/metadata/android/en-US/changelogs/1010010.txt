@@ -1,0 +1,13 @@
+Ramesh 1.1.0.10 (build 1010010) — pre-release.
+
+Copy:
+- The row I added under the bubble is gone. Copy now just puts the whole message into selection with Android's own Copy / Select all toolbar, so the menu is the one your phone already shows and nothing is written to the clipboard until you pick Copy there.
+- Tapping anywhere else leaves that mode.
+
+Fixes:
+- "Mark all as read" now works when the only thing outstanding is spam. Spam is stored already read, so the check that decided whether there was anything to mark looked at the normal unread count, saw zero, and answered "everything is already read" without clearing the spam badges. It now counts new spam too.
+- The same action also clears the unread flag on the conversation rows themselves, not only on the messages, so the unread state cannot survive in the provider while the inbox looks clean.
+
+Dates are untouched in this build.
+
+This is a pre-release: it is published with the `--prerelease` flag and is not the "latest" release.
